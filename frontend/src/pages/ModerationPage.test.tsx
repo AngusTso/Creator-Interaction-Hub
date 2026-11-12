@@ -1,8 +1,20 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as api from '../services/api';
 import type { Event, ModerationQuestion } from '../types';
 import ModerationPage from './ModerationPage';
+
+const { socketMock } = vi.hoisted(() => ({
+  socketMock: {
+    on: vi.fn(),
+    emit: vi.fn(),
+    disconnect: vi.fn(),
+  },
+}));
+
+vi.mock('socket.io-client', () => ({
+  io: vi.fn(() => socketMock),
+}));
 
 const event: Event = {
   id: 'event-1',
@@ -27,6 +39,9 @@ const pendingQuestion: ModerationQuestion = {
 describe('ModerationPage', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    socketMock.on.mockReset();
+    socketMock.emit.mockReset();
+    socketMock.disconnect.mockReset();
   });
 
   it('updates the queue after approving and answering a question', async () => {
@@ -77,5 +92,47 @@ describe('ModerationPage', () => {
     expect(await screen.findByText('ANSWERED', {
       selector: '.status-badge',
     })).toBeInTheDocument();
+  });
+
+  it('joins the event room and refreshes the queue on question notifications', async () => {
+    vi.spyOn(api, 'getEvent').mockResolvedValue(event);
+    const loadQuestions = vi.spyOn(api, 'listModerationQuestions')
+      .mockResolvedValue([pendingQuestion]);
+
+    render(
+      <ModerationPage
+        accessToken="access-token"
+        eventId={event.id}
+        onBack={vi.fn()}
+        onSessionExpired={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(loadQuestions).toHaveBeenCalledTimes(1));
+    const connectHandler = socketMock.on.mock.calls.find(
+      ([eventName]) => eventName === 'connect',
+    )?.[1];
+    const questionHandler = socketMock.on.mock.calls.find(
+      ([eventName]) => eventName === 'question:created',
+    )?.[1];
+
+    expect(connectHandler).toBeTypeOf('function');
+    expect(questionHandler).toBeTypeOf('function');
+
+    await act(async () => {
+      connectHandler?.();
+    });
+    expect(socketMock.emit).toHaveBeenCalledWith('moderation:join', event.id);
+
+    await act(async () => {
+      questionHandler?.({ eventId: event.id });
+    });
+    await waitFor(() => expect(loadQuestions).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      connectHandler?.();
+    });
+    await waitFor(() => expect(loadQuestions).toHaveBeenCalledTimes(3));
+    expect(socketMock.emit).toHaveBeenCalledTimes(2);
   });
 });

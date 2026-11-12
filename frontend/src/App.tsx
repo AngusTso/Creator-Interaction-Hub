@@ -4,41 +4,12 @@ import EventsPage from './pages/EventsPage';
 import LoginPage from './pages/LoginPage';
 import ModerationPage from './pages/ModerationPage';
 import PublicEventPage from './pages/PublicEventPage';
+import { getRoute, navigate } from './routing';
 import type { Creator } from './types';
-
-type Route =
-  | { page: 'home' }
-  | { page: 'login' }
-  | { page: 'events' }
-  | { page: 'moderation'; eventId: string }
-  | { page: 'public'; publicCode: string }
-  | { page: 'not-found' };
 
 interface Session {
   creator: Creator;
   accessToken: string;
-}
-
-function getRoute(hash: string): Route {
-  const path = hash.replace(/^#/, '') || '/';
-  const publicMatch = /^\/public\/([a-f0-9]{32})$/.exec(path);
-  if (publicMatch) {
-    return { page: 'public', publicCode: publicMatch[1] };
-  }
-
-  const moderationMatch = /^\/creator\/events\/([^/]+)$/.exec(path);
-  if (moderationMatch) {
-    return { page: 'moderation', eventId: moderationMatch[1] };
-  }
-
-  if (path === '/') return { page: 'home' };
-  if (path === '/login') return { page: 'login' };
-  if (path === '/creator') return { page: 'events' };
-  return { page: 'not-found' };
-}
-
-function navigate(path: string) {
-  window.location.hash = path;
 }
 
 export default function App() {

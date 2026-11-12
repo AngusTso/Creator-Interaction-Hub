@@ -103,6 +103,13 @@ Priority cases:
 - Duplicate votes using the same voter key are rejected.
 - Closed polls reject new votes.
 
+**Real-time moderation**
+
+- Unauthenticated socket connections are rejected.
+- A creator can join only moderation rooms for their own events.
+- A newly persisted question notifies only the moderators in its event room.
+- Reconnecting moderators re-fetch authoritative data through the REST API.
+
 ### 4.3 Frontend Tests
 
 Frontend tests should focus on important behaviour rather than testing every component.
@@ -115,6 +122,7 @@ Priority cases:
 - Approve/reject actions update the displayed state.
 - Public event page does not display pending or rejected questions.
 - Question submission displays success and error feedback.
+- New-question notifications refresh the moderator queue.
 
 ### 4.4 End-to-End Manual Verification
 

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { io } from 'socket.io-client';
 import {
   ApiError,
   getErrorMessage,
@@ -35,8 +36,9 @@ export default function ModerationPage({
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [busyQuestionId, setBusyQuestionId] = useState<string | null>(null);
+  const [liveStatus, setLiveStatus] = useState('CONNECTING');
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setError(null);
     setIsLoading(true);
     try {
@@ -55,11 +57,44 @@ export default function ModerationPage({
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [accessToken, eventId, onSessionExpired]);
 
   useEffect(() => {
     void loadData();
-  }, [accessToken, eventId]);
+  }, [loadData]);
+
+  useEffect(() => {
+    const socket = io({
+      auth: { token: accessToken },
+    });
+    let hasConnected = false;
+
+    socket.on('connect', () => {
+      const isReconnect = hasConnected;
+      hasConnected = true;
+      setLiveStatus('CONNECTED');
+      socket.emit('moderation:join', eventId);
+      if (isReconnect) {
+        void loadData();
+      }
+    });
+    socket.on('disconnect', () => setLiveStatus('RECONNECTING'));
+    socket.on('connect_error', (connectionError) => {
+      setLiveStatus('OFFLINE / USE REFRESH');
+      if (connectionError.message === 'UNAUTHENTICATED') {
+        onSessionExpired();
+      }
+    });
+    socket.on('question:created', (notification: { eventId: string }) => {
+      if (notification.eventId === eventId) {
+        void loadData();
+      }
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [accessToken, eventId, loadData, onSessionExpired]);
 
   const visibleQuestions = filter === 'ALL'
     ? questions
@@ -109,6 +144,9 @@ export default function ModerationPage({
             {event
               ? `EVENT STATUS / ${event.status}`
               : 'Review submitted questions and update their status.'}
+          </p>
+          <p className="fine-print" role="status">
+            LIVE UPDATES / {liveStatus}
           </p>
         </div>
         <button

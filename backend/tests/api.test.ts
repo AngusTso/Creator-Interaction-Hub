@@ -1,6 +1,14 @@
 import bcrypt from 'bcryptjs';
 import request from 'supertest';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import { createApp } from '../src/app.js';
 import { pool } from '../src/database/pool.js';
 import { runMigrations } from '../src/database/migrations.js';
@@ -9,7 +17,12 @@ const testDatabaseConfigured = Boolean(process.env.TEST_DATABASE_URL);
 const testTokenSecret = new TextEncoder().encode(
   'test-only-jwt-secret-not-for-application-use',
 );
-const app = createApp({ database: pool, tokenSecret: testTokenSecret });
+const questionNotifier = vi.fn();
+const app = createApp({
+  database: pool,
+  tokenSecret: testTokenSecret,
+  notifyQuestionSubmitted: questionNotifier,
+});
 const ownerPassword = 'owner-test-password';
 const otherPassword = 'other-test-password';
 
@@ -53,6 +66,7 @@ describe.skipIf(!testDatabaseConfigured)('Milestone 2 API', () => {
   });
 
   beforeEach(async () => {
+    questionNotifier.mockClear();
     await pool.query('TRUNCATE questions, events CASCADE');
   });
 
@@ -164,6 +178,7 @@ describe.skipIf(!testDatabaseConfigured)('Milestone 2 API', () => {
       .send({ displayName: 'Audience', content: 'A question' });
     expect(inactiveSubmission.status).toBe(409);
     expect(inactiveSubmission.body.error.code).toBe('EVENT_NOT_ACTIVE');
+    expect(questionNotifier).not.toHaveBeenCalled();
 
     await request(app)
       .patch(`/api/events/${event.id}/status`)
@@ -174,6 +189,7 @@ describe.skipIf(!testDatabaseConfigured)('Milestone 2 API', () => {
       .post(`/api/public/events/${event.publicCode}/questions`)
       .send({ displayName: ' ', content: '' });
     expect(invalidSubmission.status).toBe(400);
+    expect(questionNotifier).not.toHaveBeenCalled();
 
     const submission = await request(app)
       .post(`/api/public/events/${event.publicCode}/questions`)
@@ -184,6 +200,8 @@ describe.skipIf(!testDatabaseConfigured)('Milestone 2 API', () => {
       content: 'What inspired you?',
       status: 'PENDING',
     });
+    expect(questionNotifier).toHaveBeenCalledOnce();
+    expect(questionNotifier).toHaveBeenCalledWith(event.id);
   });
 
   it('restricts moderation and publicly returns only approved or answered questions', async () => {

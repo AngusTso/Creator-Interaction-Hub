@@ -7,8 +7,9 @@ not a streaming platform or a replacement for livestream chat.
 The application supports creator login, event management, public event access,
 audience question submission, moderation, and public approved-question display.
 The frontend provides creator login and event management, question moderation,
-and the public participation page. Polls and real-time notifications are not
-implemented.
+and the public participation page. The moderator queue receives real-time
+notifications for new questions and refreshes authoritative data through REST.
+Polls are not implemented.
 
 The frontend uses modular plain CSS and locally bundled Inter, Space Grotesk,
 and JetBrains Mono fonts. It does not use Tailwind CSS or a component library;
@@ -81,6 +82,8 @@ refresh-token endpoint.
 Basic request validation and ownership checks are implemented. Per-IP rate
 limiting is deferred; proxy-aware rate limits need a deliberate configuration
 because browser API requests pass through the Vite proxy in development.
+The public audience page still requires manual refresh to see later question
+status changes.
 
 ## Run checks
 

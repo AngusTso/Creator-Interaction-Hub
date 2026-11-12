@@ -32,5 +32,56 @@ service already occupied port 5432, so the Compose database was exposed on
    reconnected successfully after logging the idle-client error.
 10. Removed the temporary browser-test event and its associated questions.
 
-The audience and moderation pages use explicit refresh controls; real-time
-notifications and polls remain out of scope.
+At Milestone 3 completion, both pages used explicit refresh controls. Real-time
+moderator notifications were added during Milestone 4; polls remain out of
+scope.
+
+## Milestone 4 Verification
+
+Date: 2026-11-13
+
+### Automated checks
+
+| Check | Result |
+| --- | --- |
+| Backend Vitest + Supertest API and Socket.IO tests with isolated `creator_hub_test` database | 12 passed |
+| Backend TypeScript check and build | Passed |
+| Frontend Vitest + React Testing Library | 10 passed |
+| Frontend TypeScript check and production build | Passed |
+| Backend runtime dependency audit | 0 vulnerabilities |
+| Frontend dependency audit | 0 vulnerabilities |
+| `git diff --check` | Passed |
+
+### Clean Compose and persistence check
+
+Built and started a fresh, isolated Compose project with `.env.example` and
+separate host ports (55432 for PostgreSQL, 3301 for the API, and 5174 for the
+frontend). The existing development database volume was not used.
+
+The API health check reported `ok` with PostgreSQL connected, and the frontend
+returned HTTP 200. The Q&A API workflow succeeded: create and activate an
+event, submit a question, approve it, mark it answered, restart the backend and
+frontend containers, then confirm the public API still returned the question
+as `ANSWERED`.
+
+An authenticated moderator joined the event room through the frontend's Vite
+proxy. A question submitted through that proxy produced a notification for the
+joined room. Automated tests also verified that unauthenticated sockets and
+creators attempting to join another creator's room are rejected.
+
+### Milestone 3 review follow-up
+
+- Issue 1: the source `/src/main.tsx` path is rewritten by Vite to hashed
+  `/assets/` files in production builds. No change was needed for root-path
+  deployment; a subdirectory deployment would require Vite's `base` setting.
+- Issue 2: route matching and navigation were moved out of `App.tsx` into
+  `frontend/src/routing.ts`, with focused route tests. Session state remains
+  in `App.tsx`; a broader provider abstraction was not needed.
+
+### Remaining optional work
+
+Polls remain unimplemented. Public audience pages still require manual refresh
+to see later status changes. Per-IP rate limiting is deferred: browser requests
+pass through the Vite proxy, so the backend sees the proxy address rather than
+the audience IP. Trusting forwarded headers without a defined trusted-proxy
+boundary would allow clients to spoof their rate-limit identity.

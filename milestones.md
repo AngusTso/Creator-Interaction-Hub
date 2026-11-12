@@ -161,7 +161,10 @@ Check:
 8. Add polls only if sufficient time remains.
 9. Improve obvious usability issues.
 10. Complete and verify README setup instructions.
-11. Review code structure and remove unnecessary complexity.
+11. Review code structure and remove unnecessary complexity, including
+    Milestone 3 review Issue 2: assess whether routing and session management
+    in `frontend/src/App.tsx` should be separated; refactor only if it improves
+    clarity without adding unnecessary abstraction.
 12. Document known limitations.
 
 ### Acceptance Criteria

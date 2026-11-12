@@ -1,6 +1,6 @@
 import type { Request, RequestHandler } from 'express';
-import { jwtVerify } from 'jose';
 import { ApiError } from '../lib/api-error.js';
+import { verifyAccessToken } from '../modules/auth/token.js';
 import type { AuthenticatedUser } from '../modules/auth/types.js';
 
 export function createAuthenticate(
@@ -16,24 +16,10 @@ export function createAuthenticate(
     }
 
     try {
-      const { payload } = await jwtVerify(match[1], tokenSecret, {
-        algorithms: ['HS256'],
-      });
-
-      if (
-        typeof payload.sub !== 'string' ||
-        typeof payload.username !== 'string' ||
-        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-          payload.sub,
-        )
-      ) {
-        next(new ApiError(401, 'UNAUTHENTICATED', 'The access token is invalid or expired.'));
-        return;
-      }
-
+      const verifiedToken = await verifyAccessToken(match[1], tokenSecret);
       const user: AuthenticatedUser = {
-        id: payload.sub,
-        username: payload.username,
+        id: verifiedToken.id,
+        username: verifiedToken.username,
       };
       request.user = user;
       next();

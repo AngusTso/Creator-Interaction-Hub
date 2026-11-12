@@ -344,6 +344,11 @@ PostgreSQL and REST remain the source of truth.
 
 Persist data successfully before emitting a corresponding notification.
 
+**Current implementation:** The backend emits new-question notifications to
+the authenticated creator's event room after the database transaction commits.
+The moderation page reloads the queue through REST when notified or when the
+socket reconnects; REST remains authoritative.
+
 ## 7. Deployment Decisions
 
 ### ADR-013: Use Docker Compose

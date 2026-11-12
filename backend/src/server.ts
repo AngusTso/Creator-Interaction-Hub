@@ -1,13 +1,37 @@
+import { EventEmitter } from 'node:events';
+import { createServer } from 'node:http';
 import { createApp } from './app.js';
 import { getJwtSecret, port } from './config/env.js';
 import { pool } from './database/pool.js';
+import { createRealtimeServer } from './realtime/server.js';
 
-const app = createApp({ database: pool, tokenSecret: getJwtSecret() });
+const tokenSecret = getJwtSecret();
+const questionEvents = new EventEmitter();
+const app = createApp({
+  database: pool,
+  tokenSecret,
+  notifyQuestionSubmitted: (eventId) => {
+    questionEvents.emit('question:submitted', eventId);
+  },
+});
+const httpServer = createServer(app);
+const realtime = createRealtimeServer(
+  httpServer,
+  tokenSecret,
+  async (creatorId, eventId) => {
+    const result = await pool.query(
+      'SELECT 1 FROM events WHERE id = $1 AND creator_id = $2',
+      [eventId, creatorId],
+    );
+    return result.rowCount === 1;
+  },
+);
+questionEvents.on('question:submitted', realtime.notifyQuestionSubmitted);
 
 async function startServer(): Promise<void> {
   await pool.query('SELECT 1');
 
-  app.listen(port, () => {
+  httpServer.listen(port, () => {
     console.log(`Backend listening on port ${port}.`);
   });
 }

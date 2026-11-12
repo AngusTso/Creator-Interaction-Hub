@@ -38,6 +38,11 @@ export interface ModerationQuestion {
   updatedAt: Date;
 }
 
+export interface SubmittedQuestion {
+  eventId: string;
+  question: Omit<PublicQuestion, 'status'> & { status: 'PENDING' };
+}
+
 function toPublicQuestion(question: PublicQuestionRow): PublicQuestion {
   return {
     id: question.id,
@@ -65,7 +70,7 @@ export async function submitQuestion(
   publicCode: string,
   displayName: string,
   content: string,
-): Promise<Omit<PublicQuestion, 'status'> & { status: 'PENDING' }> {
+): Promise<SubmittedQuestion> {
   return withTransaction(database, async (client) => {
     const eventResult = await client.query<{ id: string; status: string }>(
       'SELECT id, status FROM events WHERE public_code = $1 FOR SHARE',
@@ -89,11 +94,14 @@ export async function submitQuestion(
     const question = result.rows[0];
 
     return {
-      id: question.id,
-      displayName: question.display_name,
-      content: question.content,
-      status: 'PENDING',
-      createdAt: question.created_at,
+      eventId: event.id,
+      question: {
+        id: question.id,
+        displayName: question.display_name,
+        content: question.content,
+        status: 'PENDING',
+        createdAt: question.created_at,
+      },
     };
   });
 }

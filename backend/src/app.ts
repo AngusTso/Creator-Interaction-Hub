@@ -12,6 +12,7 @@ interface AppDependencies {
   database?: Pool;
   tokenSecret?: Uint8Array;
   databaseHealthCheck?: () => Promise<void>;
+  notifyQuestionSubmitted?: (eventId: string) => void;
 }
 
 export function createApp(dependencies: AppDependencies = {}) {
@@ -39,7 +40,14 @@ export function createApp(dependencies: AppDependencies = {}) {
 
   app.use('/api/auth', createAuthRouter(database, tokenSecret));
   app.use('/api', createEventsRouter(database, tokenSecret));
-  app.use('/api', createQuestionsRouter(database, tokenSecret));
+  app.use(
+    '/api',
+    createQuestionsRouter(
+      database,
+      tokenSecret,
+      dependencies.notifyQuestionSubmitted,
+    ),
+  );
   app.use((_request, _response, next) => {
     next(new ApiError(404, 'NOT_FOUND', 'Endpoint not found.'));
   });

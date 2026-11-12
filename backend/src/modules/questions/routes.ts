@@ -36,6 +36,7 @@ function parsePublicCode(value: string): string {
 export function createQuestionsRouter(
   database: Pool,
   tokenSecret: Uint8Array,
+  notifyQuestionSubmitted?: (eventId: string) => void,
 ): Router {
   const router = Router();
   const authenticate = createAuthenticate(tokenSecret);
@@ -43,14 +44,18 @@ export function createQuestionsRouter(
   router.post('/public/events/:publicCode/questions', async (request, response) => {
     const publicCode = parsePublicCode(request.params.publicCode);
     const input = parseInput(submitQuestionSchema, request.body);
-    const question = await submitQuestion(
+    const submission = await submitQuestion(
       database,
       publicCode,
       input.displayName,
       input.content,
     );
+    notifyQuestionSubmitted?.(submission.eventId);
 
-    response.status(201).json({ success: true, data: { question } });
+    response.status(201).json({
+      success: true,
+      data: { question: submission.question },
+    });
   });
 
   router.get('/public/events/:publicCode/questions', async (request, response) => {
