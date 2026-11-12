@@ -6,10 +6,14 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     proxy: {
-      '/api': process.env.API_PROXY_TARGET ?? 'http://localhost:3000',
+      '/api': {
+        target: process.env.API_PROXY_TARGET ?? 'http://localhost:3000',
+        xfwd: true,
+      },
       '/socket.io': {
         target: process.env.API_PROXY_TARGET ?? 'http://localhost:3000',
         ws: true,
+        xfwd: true,
       },
     },
   },

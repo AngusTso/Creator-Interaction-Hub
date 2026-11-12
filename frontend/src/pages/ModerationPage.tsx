@@ -7,6 +7,7 @@ import {
   listModerationQuestions,
   updateQuestionStatus,
 } from '../services/api';
+import PollManager from './PollManager';
 import type { Event, QuestionStatus, ModerationQuestion } from '../types';
 
 interface Props {
@@ -241,6 +242,14 @@ export default function ModerationPage({
           </article>
         ))}
       </section>
+      {event && (
+        <PollManager
+          accessToken={accessToken}
+          eventId={eventId}
+          eventStatus={event.status}
+          onSessionExpired={onSessionExpired}
+        />
+      )}
     </main>
   );
 }

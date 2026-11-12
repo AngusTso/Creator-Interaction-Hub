@@ -53,10 +53,11 @@ Use dark inverse text on solid yellow actions and bars.
 - Use rectangular approve, reject, and answer controls.
 - Public views show approved and answered questions only.
 
-## Optional poll patterns
+## Poll patterns
 
-If polls are implemented in a later milestone, use a rectangular white-bordered
-track with a solid yellow result bar. Poll functionality is optional and is not
-part of the core Milestone 3 Q&A workflow.
+Use a rectangular white-bordered track with a solid yellow result bar. Keep
+counts and percentages legible over the fill and use JetBrains Mono for
+numbers. Display active and closed results; show voting controls only while
+the poll and its event are active.
 
 The current CSS tokens and components live in `frontend/src/styles.css`.

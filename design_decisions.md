@@ -20,9 +20,10 @@ The project is intentionally scoped as a small MVP. Decisions should prioritise 
 | Real-time communication  | Socket.IO, optional            |
 | Deployment               | Docker Compose                 |
 | Authentication           | Short-lived bearer access tokens |
+| Creator registration     | Open username/password signup   |
 | Audience identity        | No account required            |
 | Testing                  | Vitest + Supertest             |
-| Poll functionality       | Optional extension             |
+| Poll functionality       | One active poll per event       |
 
 ## 3. Architecture Decisions
 
@@ -198,7 +199,8 @@ A separate interaction interface provides a manageable solution without requirin
 
 ### ADR-007: Prioritise Q&A Before Polls
 
-**Decision:** Complete the question submission and moderation workflow before implementing polls.
+**Decision:** Complete the question submission and moderation workflow before
+implementing polls; add polls only after the core Q&A flow is reliable.
 
 **Context:**
 
@@ -224,11 +226,13 @@ Polls introduce additional tables, voting rules, and duplicate-vote consideratio
 - Poll functionality may be absent from the final submission.
 - Less feature breadth in exchange for a more reliable core product.
 
-**Priority:** Q&A is required; polls are optional.
+**Priority:** Q&A remains the core workflow. Polls are implemented in
+Milestone 5 without weakening Q&A reliability.
 
 ### ADR-008: Do Not Require Audience Accounts
 
-**Decision:** Allow audience members to submit questions without creating accounts.
+**Decision:** Allow audience members to submit questions and vote without
+creating accounts. Creators can register using username and password.
 
 **Context:**
 
@@ -236,20 +240,23 @@ The application is intended to be used alongside livestreams, where participatio
 
 **Reasoning:**
 
-Requiring registration introduces additional complexity, including account creation, password management, and identity handling.
+Requiring audience registration would introduce additional complexity,
+including account creation, password management, and identity handling.
 
 A display name is sufficient for the initial Q&A workflow.
 
 **Trade-offs:**
 
-- Lower participation friction.
+- Lower audience participation friction.
 - Simpler application design.
+- Creator registration still provides per-owner event authorization.
 - Limited ability to identify individual audience members.
 - Greater exposure to spam and repeated submissions.
 
 Basic rate limiting and input validation should help mitigate abuse.
 
-For optional polls, a browser-issued participant key can discourage duplicate votes, but it cannot guarantee one vote per real person.
+For polls, a browser-issued participant key stored in local storage can
+discourage duplicate votes, but it cannot guarantee one vote per real person.
 
 ## 5. Security and Data Decisions
 
@@ -317,13 +324,15 @@ Similarly, foreign keys help prevent orphaned records.
 
 ## 6. Real-Time Communication Decision
 
-### ADR-012: Treat Socket.IO as an Optional Enhancement
+### ADR-012: Treat Socket.IO as a Best-Effort Notification Layer
 
-**Decision:** Use REST as the core communication mechanism and introduce Socket.IO only if time permits.
+**Decision:** Use REST as the authoritative API and Socket.IO for best-effort
+moderator and public audience notifications.
 
 **Context:**
 
-Moderators would benefit from receiving new-question notifications without manually refreshing the dashboard.
+Moderators need new-question notifications, and public audiences need
+approved-question, event-status, and poll updates without manually refreshing.
 
 However, real-time communication introduces connection management, room authorisation, and reconnection behaviour.
 
@@ -335,8 +344,7 @@ PostgreSQL and REST remain the source of truth.
 
 **Trade-offs:**
 
-- REST-only implementation is simpler and more reliable within the MVP.
-- Socket.IO improves responsiveness when implemented.
+- Connected users see changes promptly.
 - Real-time events are not guaranteed to reach disconnected clients.
 - Clients must retrieve current state after reconnecting.
 
@@ -344,10 +352,10 @@ PostgreSQL and REST remain the source of truth.
 
 Persist data successfully before emitting a corresponding notification.
 
-**Current implementation:** The backend emits new-question notifications to
-the authenticated creator's event room after the database transaction commits.
-The moderation page reloads the queue through REST when notified or when the
-socket reconnects; REST remains authoritative.
+**Implementation:** Moderator rooms require a valid creator token and an event
+ownership check. Audience rooms are joined using the public event code and
+receive only public change notifications. The frontend reloads through REST
+on notification and reconnect; REST remains authoritative.
 
 ## 7. Deployment Decisions
 
@@ -430,7 +438,8 @@ These improvements should be driven by actual product requirements rather than i
 
 **Decision:** Creator login returns a signed bearer access token that expires
 after 15 minutes. Protected API requests send it in the `Authorization` header.
-There is no refresh-token or public registration endpoint.
+There is no refresh-token endpoint. Registration returns the same short-lived
+token as login.
 
 **Context:** The API design permits either a secure cookie session or a
 token-based approach. The project needs creator-only API access without adding
@@ -464,8 +473,64 @@ OFL font licenses. Do not use Tailwind, CSS-in-JS, or a component library.
 events and moderation states easy to scan. Local font assets avoid runtime
 requests to third-party font services.
 
-**Scope:** Poll-specific visuals remain a future extension; this decision does
-not add polls to the core Q&A milestone.
+**Scope:** Poll results use rectangular bordered tracks with solid yellow
+result bars and readable count/percentage text.
+
+### ADR-017: Allow Creator Self-Registration
+
+**Decision:** Allow creators to register with a unique, normalized username
+and password. Hash passwords with bcrypt and return a short-lived access
+token after successful registration.
+
+**Context:** The developer requested a working signup flow for the local
+interview demonstration while retaining the seeded demo creator.
+
+**Reasoning:** Username/password signup demonstrates account creation without
+requiring email delivery, an identity provider, or another service. Each
+creator remains restricted to their own events.
+
+**Trade-offs:** Registration is open to anyone who can reach the local app.
+There is no email verification or account recovery flow; the app is not
+intended as a hosted production service.
+
+### ADR-018: Use Browser Keys for Poll Duplicate Deterrence
+
+**Decision:** Generate a random participant key per browser and store it in
+`localStorage`. Enforce uniqueness per poll in PostgreSQL.
+
+**Reasoning:** This prevents accidental repeat votes after a reload without
+requiring audience accounts.
+
+**Trade-offs:** Clearing browser storage, using private browsing, or switching
+devices can bypass the check. The key is a weak deterrent, not identity
+verification.
+
+### ADR-019: Use Single-Process Rate Limits for Local Compose
+
+**Decision:** Apply per-client-IP in-memory limits to signup/login, question
+submissions, and votes. In Compose, Vite forwards the client address and the
+backend trusts the configured single proxy hop. The backend host port binds
+to loopback.
+
+**Reasoning:** This provides useful protection for one local backend without
+Redis or other infrastructure.
+
+**Trade-offs:** Counters reset on backend restart and are not shared across
+multiple backend instances. This is intentionally local-development
+protection, not a production distributed limiter.
+
+### ADR-020: Send Public Changes as Socket.IO Notifications
+
+**Decision:** Public event pages may join audience rooms using the public
+event code. Question, event, and poll changes notify those rooms only after
+the database transaction commits; clients reload through REST.
+
+**Reasoning:** The existing moderator Socket.IO service can address the
+audience status-update gap without making sockets the source of truth.
+
+**Trade-offs:** Updates are best-effort while connected; reconnecting clients
+must reload authoritative state through REST. Public rooms expose only
+already-public changes and are separate from authenticated moderation rooms.
 
 ## 11. Final Design Principle
 

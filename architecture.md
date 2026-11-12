@@ -27,7 +27,7 @@ The application consists of three primary components:
 
 1. **Frontend:** Provides the creator dashboard, moderation interface, and public audience interface.
 2. **Backend:** Handles authentication, business rules, request validation, and communication with the database.
-3. **Database:** Stores creator accounts, events, questions, and optional poll-related data.
+3. **Database:** Stores creator accounts, events, questions, polls, options, and votes.
 
 ```mermaid
 flowchart TD
@@ -40,7 +40,7 @@ flowchart TD
     BE --> AUTH[Authentication Module]
     BE --> EVENTS[Events Module]
     BE --> QUESTIONS[Questions Module]
-    BE --> POLLS[Polls Module - Optional]
+    BE --> POLLS[Polls Module]
 
     AUTH --> DB[(PostgreSQL)]
     EVENTS --> DB
@@ -59,7 +59,7 @@ The frontend is responsible for rendering the user interface and communicating w
 - **Creator Dashboard:** Lists the creator's events and provides event management actions.
 - **Event Moderation Dashboard:** Displays submitted questions and provides moderation controls.
 - **Public Event Page:** Allows audience members to view an event, submit questions, and see approved questions.
-- **Poll Interface:** Optional interface for viewing and participating in active polls.
+- **Poll Interface:** Creator poll management and public voting/results.
 
 ### Suggested structure
 
@@ -107,7 +107,7 @@ Each module is responsible for a specific domain of functionality.
 | Auth       | Creator authentication and session/token handling             |
 | Events     | Event creation, ownership, and lifecycle                      |
 | Questions  | Question submission, retrieval, and moderation                |
-| Polls      | Optional poll creation, voting, and results                   |
+| Polls      | Poll creation, voting, lifecycle, and results                  |
 | Realtime   | Optional Socket.IO events and room management                 |
 | Database   | Database connection, migrations, and shared data access       |
 | Middleware | Authentication, validation, error handling, and rate limiting |
@@ -194,6 +194,11 @@ The backend is responsible for enforcing the following rules:
 - Events can have `DRAFT`, `ACTIVE`, or `ENDED` status.
 - Only active events accept audience questions.
 - Only the event owner can manage the event.
+- An event can have at most one active poll.
+- An active poll accepts votes only while its event is active.
+- Ending an event closes its active poll.
+- A unique `(poll_id, voter_key)` constraint prevents repeat votes with the
+  same browser key.
 
 ### Question lifecycle
 
@@ -207,16 +212,19 @@ These rules must be enforced on the server, regardless of frontend behaviour.
 
 ## 7. Real-Time Communication
 
-Real-time communication is an optional improvement rather than a dependency for the core application.
-
-If implemented, Socket.IO can be used to notify moderators when new questions arrive and update audience views when question statuses change.
+Socket.IO notifies moderators when new questions arrive and updates audience
+views after question status changes, event lifecycle changes, and poll
+updates. It is a best-effort notification layer rather than a dependency for
+the REST workflow.
 
 Suggested room structure:
 
 - `event:{eventId}:moderators`
 - `event:{eventId}:audience`
 
-Room access must be authorised. A client must not be able to join a moderator room simply by supplying an event ID.
+Moderator room access requires an authenticated creator and event ownership
+verification. An audience client may join a public room only by supplying a
+valid public event code; public rooms receive no private moderation data.
 
 ### Source of truth
 
@@ -226,8 +234,7 @@ PostgreSQL remains the source of truth.
 - Socket.IO messages are notifications, not the authoritative application state.
 - Clients should retrieve the latest state through REST APIs after reconnecting.
 - The application must remain usable if the real-time connection fails.
-
-If implementation time is limited, complete the REST-based workflow first and omit Socket.IO rather than compromising core functionality.
+- Public room messages contain no pending/rejected questions or voter data.
 
 ## 8. Deployment Architecture
 
@@ -250,6 +257,11 @@ Suggested services:
 | db       | Runs PostgreSQL            |
 
 Docker Compose should configure the services, environment variables, networking, and persistent database volume.
+
+The backend API port binds to loopback. Browser requests pass through the
+Vite proxy, which forwards the originating client address for in-memory rate
+limits. The backend trusts only this configured proxy hop in the Compose
+topology.
 
 The project does not require cloud deployment. A reviewer should be able to start the application locally using the documented Docker Compose command.
 
@@ -285,7 +297,12 @@ The architecture is intentionally designed for a small MVP and has the following
 - It does not provide large-scale distributed deployment.
 - It does not integrate with external livestreaming platforms.
 - Audience participation does not require account registration.
-- A browser-issued participant key for optional poll voting is only a basic duplicate-vote deterrent, not reliable identity verification.
+- Creator registration is open username/password signup without email
+  verification or account recovery.
+- A browser-issued participant key for poll voting is only a basic
+  duplicate-vote deterrent, not reliable identity verification.
+- Rate-limit counters are in memory and reset on backend restart; no
+  distributed deployment is supported.
 - Real-time delivery is best-effort; clients must be able to recover state through REST APIs.
 
 These limitations are acceptable for the intended demonstration and can be reconsidered if the product scope changes.

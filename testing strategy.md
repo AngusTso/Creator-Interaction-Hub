@@ -68,6 +68,8 @@ Priority cases:
 
 **Authentication**
 
+- New creator can register and receives a valid access token.
+- Duplicate usernames and invalid passwords are rejected.
 - Valid creator credentials allow login.
 - Invalid credentials are rejected.
 - Unauthenticated requests cannot access protected endpoints.
@@ -96,12 +98,24 @@ Priority cases:
 - Submitted questions remain available after application restart.
 - Updated moderation statuses remain persisted.
 
-**Optional polls**
+**Polls**
 
+- Only the owner can create, list, activate, or close polls.
+- Poll creation validates option count and distinctness.
+- An event cannot have two active polls.
+- Poll activation and voting require an active event.
 - Only active polls accept votes.
 - A selected option must belong to the poll.
 - Duplicate votes using the same voter key are rejected.
 - Closed polls reject new votes.
+- Public results include active and closed polls but never voter keys.
+
+**Rate limiting**
+
+- Signup/login, question submission, and voting return the consistent `429`
+  response after their configured per-IP limit.
+- Compose proxy forwarding identifies the client without trusting
+  client-supplied `X-Forwarded-For` values.
 
 **Real-time moderation**
 
@@ -109,6 +123,9 @@ Priority cases:
 - A creator can join only moderation rooms for their own events.
 - A newly persisted question notifies only the moderators in its event room.
 - Reconnecting moderators re-fetch authoritative data through the REST API.
+- Public clients can join only the room associated with a valid public code.
+- Question status, event status, and poll changes refresh public data through
+  REST after notification and after reconnect.
 
 ### 4.3 Frontend Tests
 
@@ -121,6 +138,10 @@ Priority cases:
 - Moderator dashboard displays questions and their statuses.
 - Approve/reject actions update the displayed state.
 - Public event page does not display pending or rejected questions.
+- Public page receives approved-question and poll updates without a manual
+  refresh when connected.
+- Signup toggles between registration and login and presents API errors.
+- Poll UI displays vote counts and percentages and reports duplicate votes.
 - Question submission displays success and error feedback.
 - New-question notifications refresh the moderator queue.
 
@@ -139,7 +160,13 @@ Before submission, perform a complete workflow using the running application.
 9. Confirm the approved question appears on the public page.
 10. Mark the question as answered.
 11. Confirm the updated status is visible.
-12. Restart the application and verify that the event and question data remain available.
+12. Create and activate a poll, vote from the audience page, and verify live
+    results and duplicate-vote rejection.
+13. Approve a question and verify the already-open audience page updates
+    without manual refresh.
+14. End the event and verify its active poll is closed.
+15. Restart the application and verify that events, questions, polls, and
+    votes remain available.
 
 This workflow is the primary acceptance test for the MVP.
 
@@ -226,9 +253,9 @@ Given the limited implementation time, testing should follow this order:
 | P0       | Docker startup and database persistence   |
 | P1       | Frontend behaviour and error handling     |
 | P1       | Rate limiting                             |
+| P1       | Audience and moderator real-time updates  |
+| P1       | Poll and voting rules                     |
 | P1       | Regression testing                        |
-| P2       | Real-time behaviour                       |
-| P2       | Poll and voting tests                     |
 
 A smaller number of meaningful tests is preferable to many superficial tests.
 

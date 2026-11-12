@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { createServer } from 'node:http';
 import { createApp } from './app.js';
-import { getJwtSecret, port } from './config/env.js';
+import { getJwtSecret, getTrustProxyHops, port } from './config/env.js';
 import { pool } from './database/pool.js';
 import { createRealtimeServer } from './realtime/server.js';
 
@@ -10,8 +10,18 @@ const questionEvents = new EventEmitter();
 const app = createApp({
   database: pool,
   tokenSecret,
+  trustProxyHops: getTrustProxyHops(),
   notifyQuestionSubmitted: (eventId) => {
     questionEvents.emit('question:submitted', eventId);
+  },
+  notifyQuestionStatusChanged: (eventId) => {
+    questionEvents.emit('question:status', eventId);
+  },
+  notifyEventUpdated: (eventId) => {
+    questionEvents.emit('event:updated', eventId);
+  },
+  notifyPollUpdated: (eventId) => {
+    questionEvents.emit('poll:updated', eventId);
   },
 });
 const httpServer = createServer(app);
@@ -25,8 +35,18 @@ const realtime = createRealtimeServer(
     );
     return result.rowCount === 1;
   },
+  async (publicCode) => {
+    const result = await pool.query<{ id: string }>(
+      'SELECT id FROM events WHERE public_code = $1',
+      [publicCode],
+    );
+    return result.rows[0]?.id ?? null;
+  },
 );
 questionEvents.on('question:submitted', realtime.notifyQuestionSubmitted);
+questionEvents.on('question:status', realtime.notifyQuestionStatusChanged);
+questionEvents.on('event:updated', realtime.notifyEventUpdated);
+questionEvents.on('poll:updated', realtime.notifyPollUpdated);
 
 async function startServer(): Promise<void> {
   await pool.query('SELECT 1');

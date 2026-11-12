@@ -2,7 +2,7 @@
 
 ## Development Strategy
 
-Build the application through four major milestones.
+Build the application through six milestones.
 
 Each milestone must be completed and reviewed before moving to the next one.
 
@@ -196,8 +196,100 @@ Perform a final independent review:
 
 **Complete the core workflow before adding optional functionality.**
 
-If time becomes limited, reduce or remove real-time features and polls rather than compromising correctness, security, tests, or maintainability.
+Milestone 5 adds the agreed signup, audience real-time updates, polls, voter-key
+duplicate deterrence, rate limiting, and loading-state improvement after the
+core Q&A workflow is complete. If time becomes limited, reduce optional polish
+rather than compromising correctness, security, tests, or maintainability.
 
 The goal is not to generate the most code in the shortest time.
 
 The goal is to use AI effectively to deliver a small, reliable, understandable software system.
+
+---
+
+## Milestone 5 — Audience Updates, Signup, Polls, and Rate Limits
+
+**Objective:** Complete the agreed interaction features and address the
+remaining audience-page and loading-state review findings.
+
+### Agent Tasks
+
+1. Update requirements, API, database, architecture, and design-decision
+   documents to reflect the approved Milestone 5 behavior.
+2. Add public creator registration using normalized unique usernames,
+   bcrypt-hashed passwords, and immediate login after successful registration.
+3. Add poll creation, listing, activation, closure, voting, and result display.
+4. Enforce 2–6 distinct options, one active poll per event, active-event-only
+   voting, and automatic poll closure when an event ends.
+5. Generate and persist a browser participant key in local storage; enforce
+   one vote per key per poll in PostgreSQL and describe its bypass limitations.
+6. Publish active and closed poll results; show live counts/percentages.
+7. Notify connected audience pages of question status, event status, and poll
+   updates; refresh authoritative state through REST and on reconnect.
+8. Add in-memory IP-based limits for registration/login, question submission,
+   and voting, using the local Vite proxy boundary safely.
+9. Reduce disruptive initial full-page loading states without introducing a
+   new routing framework or visual design system.
+10. Add focused backend and frontend tests for success, validation, ownership,
+    duplicate voting, rate limits, realtime access, and recovery.
+11. Verify the complete application through Docker Compose and test the
+    end-to-end creator/audience workflows.
+
+### Acceptance Criteria
+
+- A new creator can register, is signed in, and can manage only their own
+  events; the seeded demo creator still works.
+- An audience member sees newly approved/answered questions and event/poll
+  changes without manual refresh while connected; REST refresh remains the
+  recovery mechanism.
+- Creators can create and manage polls; no event can have more than one active
+  poll; only active events accept votes.
+- A browser key can cast only one vote per poll; closed and inactive polls
+  reject votes; public results are visible during and after voting.
+- Rate-limited endpoints return a consistent `429` response, and proxy
+  handling does not trust arbitrary client-supplied forwarding headers.
+- Backend/frontend tests, typechecks, and builds pass.
+- `docker compose up --build` starts the app and the persisted database
+  survives application-container restart.
+
+### Human Review
+
+Check:
+
+- Registration validation, password hashing, and account ownership.
+- Public Socket.IO room authorization and REST recovery.
+- Poll lifecycle, database constraints, vote-key limitations, and result
+  visibility.
+- Rate-limit identity and the local-only proxy trust boundary.
+- Tests and Docker evidence are real and reproducible.
+
+---
+
+## Milestone 6 — Independent Review and Final Submission
+
+**Objective:** Address the independent Milestone 5 review, verify the final
+repository, and prepare concise submission materials after implementation is
+stable.
+
+### Agent Tasks
+
+1. Triage each Cline finding against the implementation, documented
+   requirements, and test evidence.
+2. Fix valid defects and add regression tests without broadening the product.
+3. Rerun automated tests, typechecks, builds, Docker Compose startup, and the
+   complete manual workflow.
+4. Update README setup/demo instructions and document actual feature behavior.
+5. Prepare submission-focused documentation: architecture/decisions, AI
+   implementation and independent-review workflow, observed test results,
+   manual verification, and known limitations.
+6. Check repository hygiene, ignored secrets, and accurate setup commands.
+
+### Acceptance Criteria
+
+- All accepted review findings are fixed or explicitly documented with a
+  reason.
+- Current test and Docker results are recorded from actual executions.
+- Submission documentation matches the final implementation and contains no
+  invented time estimates or unverified claims.
+- The project remains runnable with the documented local Docker Compose
+  workflow.

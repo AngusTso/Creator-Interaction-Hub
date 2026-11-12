@@ -18,10 +18,21 @@ const testTokenSecret = new TextEncoder().encode(
   'test-only-jwt-secret-not-for-application-use',
 );
 const questionNotifier = vi.fn();
+const questionStatusNotifier = vi.fn();
+const eventNotifier = vi.fn();
+const pollNotifier = vi.fn();
 const app = createApp({
   database: pool,
   tokenSecret: testTokenSecret,
   notifyQuestionSubmitted: questionNotifier,
+  notifyQuestionStatusChanged: questionStatusNotifier,
+  notifyEventUpdated: eventNotifier,
+  notifyPollUpdated: pollNotifier,
+  rateLimitOverrides: {
+    authentication: 100,
+    questionSubmission: 100,
+    pollVote: 100,
+  },
 });
 const ownerPassword = 'owner-test-password';
 const otherPassword = 'other-test-password';
@@ -67,6 +78,9 @@ describe.skipIf(!testDatabaseConfigured)('Milestone 2 API', () => {
 
   beforeEach(async () => {
     questionNotifier.mockClear();
+    questionStatusNotifier.mockClear();
+    eventNotifier.mockClear();
+    pollNotifier.mockClear();
     await pool.query('TRUNCATE questions, events CASCADE');
   });
 
@@ -100,6 +114,37 @@ describe.skipIf(!testDatabaseConfigured)('Milestone 2 API', () => {
     expect(unknownUser.status).toBe(401);
     expect(unknownUser.body.error.message).toBe(incorrectPassword.body.error.message);
     expect(incorrectPassword.status).toBe(401);
+  });
+
+  it('registers a creator, signs them in, and rejects duplicate usernames', async () => {
+    const registration = await request(app)
+      .post('/api/auth/register')
+      .send({ username: '  NewCreator  ', password: 'a-secure-password' });
+
+    expect(registration.status).toBe(201);
+    expect(registration.body.data.user).toMatchObject({
+      id: expect.any(String),
+      username: 'newcreator',
+    });
+    expect(registration.body.data.accessToken).toEqual(expect.any(String));
+    expect(registration.body.data.user.password_hash).toBeUndefined();
+
+    const ownedEvents = await request(app)
+      .get('/api/events')
+      .set('Authorization', `Bearer ${registration.body.data.accessToken}`);
+    expect(ownedEvents.status).toBe(200);
+    expect(ownedEvents.body.data.events).toEqual([]);
+
+    const duplicate = await request(app)
+      .post('/api/auth/register')
+      .send({ username: 'NEWCREATOR', password: 'a-secure-password' });
+    expect(duplicate.status).toBe(409);
+    expect(duplicate.body.error.code).toBe('USERNAME_ALREADY_EXISTS');
+
+    const weakPassword = await request(app)
+      .post('/api/auth/register')
+      .send({ username: 'another', password: 'short' });
+    expect(weakPassword.status).toBe(400);
   });
 
   it('requires authentication and limits creators to their own events', async () => {
@@ -153,6 +198,7 @@ describe.skipIf(!testDatabaseConfigured)('Milestone 2 API', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ status: 'ACTIVE' });
     expect(activate.body.data.event.status).toBe('ACTIVE');
+    expect(eventNotifier).toHaveBeenCalledWith(event.id);
 
     const end = await request(app)
       .patch(`/api/events/${event.id}/status`)
@@ -238,6 +284,7 @@ describe.skipIf(!testDatabaseConfigured)('Milestone 2 API', () => {
       .set('Authorization', `Bearer ${ownerToken}`)
       .send({ status: 'APPROVED' });
     expect(approve.body.data.question.status).toBe('APPROVED');
+    expect(questionStatusNotifier).toHaveBeenCalledWith(event.id);
 
     const otherCreatorModeration = await request(app)
       .patch(`/api/questions/${pending.body.data.question.id}/status`)
@@ -280,5 +327,128 @@ describe.skipIf(!testDatabaseConfigured)('Milestone 2 API', () => {
       .set('Authorization', `Bearer ${ownerToken}`);
     expect(moderatedQuestions.body.data.questions).toHaveLength(1);
     expect(moderatedQuestions.body.data.questions[0].status).toBe('REJECTED');
+  });
+
+  it('manages public polls and enforces voting and lifecycle rules', async () => {
+    const ownerToken = await login('owner', ownerPassword);
+    const otherToken = await login('other', otherPassword);
+    const event = await createEvent(ownerToken);
+
+    const draftActivation = await request(app)
+      .post(`/api/events/${event.id}/polls`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ title: 'Choose a topic', options: ['Build', 'Design'] });
+    expect(draftActivation.status).toBe(201);
+    const draftPoll = draftActivation.body.data.poll;
+
+    const publicDrafts = await request(app)
+      .get(`/api/public/events/${event.publicCode}/polls`);
+    expect(publicDrafts.body.data.polls).toEqual([]);
+
+    const activateBeforeEvent = await request(app)
+      .patch(`/api/polls/${draftPoll.id}/status`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ status: 'ACTIVE' });
+    expect(activateBeforeEvent.status).toBe(409);
+    expect(activateBeforeEvent.body.error.code).toBe('EVENT_NOT_ACTIVE');
+
+    await request(app)
+      .patch(`/api/events/${event.id}/status`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ status: 'ACTIVE' });
+
+    const duplicateOptions = await request(app)
+      .post(`/api/events/${event.id}/polls`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ title: 'Duplicate choices', options: ['Yes', ' yes '] });
+    expect(duplicateOptions.status).toBe(400);
+
+    const secondPollResponse = await request(app)
+      .post(`/api/events/${event.id}/polls`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ title: 'Second poll', options: ['One', 'Two'] });
+    expect(secondPollResponse.status).toBe(201);
+    const secondPoll = secondPollResponse.body.data.poll;
+    const creatorPolls = await request(app)
+      .get(`/api/events/${event.id}/polls`)
+      .set('Authorization', `Bearer ${ownerToken}`);
+    expect(creatorPolls.body.data.polls).toHaveLength(2);
+    const otherCreatorPolls = await request(app)
+      .get(`/api/events/${event.id}/polls`)
+      .set('Authorization', `Bearer ${otherToken}`);
+    expect(otherCreatorPolls.status).toBe(403);
+
+    const otherCreator = await request(app)
+      .patch(`/api/polls/${draftPoll.id}/status`)
+      .set('Authorization', `Bearer ${otherToken}`)
+      .send({ status: 'ACTIVE' });
+    expect(otherCreator.status).toBe(403);
+
+    const activate = await request(app)
+      .patch(`/api/polls/${draftPoll.id}/status`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ status: 'ACTIVE' });
+    expect(activate.body.data.poll.status).toBe('ACTIVE');
+    expect(pollNotifier).toHaveBeenCalledWith(event.id);
+
+    const competingActivation = await request(app)
+      .patch(`/api/polls/${secondPoll.id}/status`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ status: 'ACTIVE' });
+    expect(competingActivation.status).toBe(409);
+    expect(competingActivation.body.error.code).toBe('ACTIVE_POLL_EXISTS');
+
+    const optionId = draftPoll.options[0].id as string;
+    const invalidOption = await request(app)
+      .post(`/api/polls/${draftPoll.id}/votes`)
+      .send({
+        optionId: secondPoll.options[0].id,
+        voterKey: '3c2b9e57-8d35-4b9e-90e8-76b0c9d0b1f1',
+      });
+    expect(invalidOption.status).toBe(400);
+
+    const voterKey = '1c2b9e57-8d35-4b9e-90e8-76b0c9d0b1f1';
+    const vote = await request(app)
+      .post(`/api/polls/${draftPoll.id}/votes`)
+      .send({ optionId, voterKey });
+    expect(vote.status).toBe(200);
+    expect(vote.body.data.poll.totalVotes).toBe(1);
+    expect(vote.body.data.poll.options[0].votes).toBe(1);
+    expect(pollNotifier).toHaveBeenLastCalledWith(event.id);
+
+    const liveResults = await request(app)
+      .get(`/api/public/events/${event.publicCode}/polls`);
+    expect(liveResults.body.data.polls[0]).toMatchObject({
+      status: 'ACTIVE',
+      totalVotes: 1,
+    });
+
+    const duplicateVote = await request(app)
+      .post(`/api/polls/${draftPoll.id}/votes`)
+      .send({ optionId, voterKey });
+    expect(duplicateVote.status).toBe(409);
+    expect(duplicateVote.body.error.code).toBe('DUPLICATE_VOTE');
+
+    const endEvent = await request(app)
+      .patch(`/api/events/${event.id}/status`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ status: 'ENDED' });
+    expect(endEvent.body.data.event.status).toBe('ENDED');
+
+    const publicResults = await request(app)
+      .get(`/api/public/events/${event.publicCode}/polls`);
+    expect(publicResults.body.data.polls).toHaveLength(1);
+    expect(publicResults.body.data.polls[0].status).toBe('CLOSED');
+    expect(publicResults.body.data.polls[0].totalVotes).toBe(1);
+    expect(JSON.stringify(publicResults.body)).not.toContain(voterKey);
+
+    const lateVote = await request(app)
+      .post(`/api/polls/${draftPoll.id}/votes`)
+      .send({
+        optionId: draftPoll.options[1].id,
+        voterKey: '2c2b9e57-8d35-4b9e-90e8-76b0c9d0b1f1',
+      });
+    expect(lateVote.status).toBe(409);
+    expect(lateVote.body.error.code).toBe('POLL_NOT_ACTIVE');
   });
 });

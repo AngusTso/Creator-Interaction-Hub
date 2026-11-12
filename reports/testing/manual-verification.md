@@ -78,10 +78,46 @@ creators attempting to join another creator's room are rejected.
   `frontend/src/routing.ts`, with focused route tests. Session state remains
   in `App.tsx`; a broader provider abstraction was not needed.
 
-### Remaining optional work
+### Milestone 3 deferred work (subsequently addressed in Milestone 5)
 
 Polls remain unimplemented. Public audience pages still require manual refresh
 to see later status changes. Per-IP rate limiting is deferred: browser requests
 pass through the Vite proxy, so the backend sees the proxy address rather than
 the audience IP. Trusting forwarded headers without a defined trusted-proxy
 boundary would allow clients to spoof their rate-limit identity.
+
+## Milestone 5 Verification
+
+Date: 2026-11-13
+
+### Automated checks
+
+| Check | Result |
+| --- | --- |
+| Backend Vitest + Supertest API, Socket.IO, and rate-limit tests with isolated `creator_hub_test` database | 17 passed |
+| Backend TypeScript check and build | Passed |
+| Frontend Vitest + React Testing Library | 19 passed |
+| Frontend TypeScript check and production build | Passed |
+| Backend runtime dependency audit | 0 vulnerabilities |
+| Frontend dependency audit | 0 vulnerabilities |
+| Docker Compose configuration and fresh image build | Passed |
+
+### Docker runtime and end-to-end checks
+
+Built and started the full stack as isolated Compose project
+`creator-hub-m5-verify`, using the example environment and its own named
+PostgreSQL volume. The frontend returned HTTP 200; `/api/health` reported the
+backend ready with PostgreSQL connected.
+
+The running API successfully registered a creator, created and activated an
+event, accepted an audience question, kept its pending state hidden publicly,
+and exposed it after approval. Poll creation and activation succeeded; a vote
+was counted, reuse of its voter key returned `409`, and results remained
+public after closing the poll. The question rate limiter returned `429` after
+the fifth request from the same IP (one prior question submission was part of
+that five-request total).
+
+An unauthenticated audience Socket.IO client joined through the Vite proxy and
+received the `event:updated` notification. After restarting the backend,
+health returned successfully and the previously approved question and poll
+vote were still present in PostgreSQL.

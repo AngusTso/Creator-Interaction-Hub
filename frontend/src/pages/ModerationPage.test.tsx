@@ -39,6 +39,7 @@ const pendingQuestion: ModerationQuestion = {
 describe('ModerationPage', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.spyOn(api, 'listCreatorPolls').mockResolvedValue([]);
     socketMock.on.mockReset();
     socketMock.emit.mockReset();
     socketMock.disconnect.mockReset();

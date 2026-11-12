@@ -7,6 +7,7 @@ Creator Interaction Hub uses a REST API to connect the React frontend with the N
 The API is responsible for:
 
 - Creator authentication.
+- Creator registration.
 - Event creation and management.
 - Public event information.
 - Audience question submission.
@@ -111,11 +112,32 @@ Successful response:
 }
 ```
 
-Protected endpoints require the token in the `Authorization: Bearer <accessToken>` header. Access tokens expire after 15 minutes; the creator must log in again after expiration. No public registration or refresh-token endpoint is provided.
+Protected endpoints require the token in the `Authorization: Bearer <accessToken>` header. Access tokens expire after 15 minutes; the creator must log in again after expiration. No refresh-token endpoint is provided.
 
 Login failures should return a generic authentication error rather than revealing whether a username exists.
 
 The demo creator is created by the development seed command using `SEED_CREATOR_USERNAME` and `SEED_CREATOR_PASSWORD`. These credentials must be configured locally and must not be used in production.
+
+### 3.2 Register
+
+**POST `/api/auth/register`**
+
+Authentication: Not required.
+
+Request:
+
+```json
+{
+  "username": "new_creator",
+  "password": "a-long-example-password"
+}
+```
+
+Username is trimmed, normalized to lowercase, and must be 1–100 characters.
+Password must be at least 12 characters and no more than 72 UTF-8 bytes.
+Registration returns `201 Created` with the same user and access-token shape
+as login. Duplicate usernames return `409 Conflict` with
+`USERNAME_ALREADY_EXISTS`.
 
 ## 4. Event Endpoints
 
@@ -279,7 +301,9 @@ Backend requirements:
 - Verify that the event is active.
 - Validate the display name and question content.
 - Create the question with `PENDING` status.
-- Rate limiting is deferred; public submission endpoints should be rate limited in a future milestone.
+- Limit question submissions to 5 requests per client IP per 10 minutes.
+- Rate limit failures return `429 Too Many Requests` and the standard error
+  envelope.
 - Return a suitable error if the event is not accepting questions.
 
 ### 5.2 Get Public Questions
@@ -375,12 +399,12 @@ The backend must:
 - Verify ownership of the question's event.
 - Validate the status transition.
 - Persist the update before emitting any optional real-time notification.
+- After persistence, notify the audience room for the event so connected
+  public pages can reload approved questions through REST.
 
 Invalid transitions should return `409 Conflict`.
 
-## 6. Optional Poll Endpoints
-
-Poll functionality is a lower-priority extension. These endpoints should only be implemented after the core Q&A workflow is complete.
+## 6. Poll Endpoints
 
 ### 6.1 Create Poll
 
@@ -397,17 +421,30 @@ Request:
 }
 ```
 
-The backend verifies event ownership and creates the poll and its options.
+The backend verifies event ownership and atomically creates a draft poll and
+its options. A poll has a title and 2–6 distinct options; each option is
+1–200 characters.
 
-### 6.2 Get Active Public Poll
+### 6.2 List Creator Polls
 
-**GET `/api/public/events/:publicCode/polls/active`**
+**GET `/api/events/:id/polls`**
+
+Authentication: Required. The creator must own the event.
+
+Returns all polls for the event, including draft polls, with option labels,
+vote counts, and percentages.
+
+### 6.3 List Public Polls and Results
+
+**GET `/api/public/events/:publicCode/polls`**
 
 Authentication: Not required.
 
-Returns the active poll and its available options without exposing voter information.
+Returns active and closed polls with public results. Draft polls and voter
+keys are never exposed. Results are visible while voting is open and remain
+available after closure.
 
-### 6.3 Update Poll Status
+### 6.4 Update Poll Status
 
 **PATCH `/api/polls/:id/status`**
 
@@ -421,15 +458,12 @@ Request:
 }
 ```
 
-Allowed statuses:
+Allowed transitions are `DRAFT → ACTIVE` and `ACTIVE → CLOSED`. The event must
+be active when a poll is activated, and an event can have at most one active
+poll. Ending an event automatically closes its active poll. The backend
+verifies ownership and validates transitions.
 
-- `DRAFT`
-- `ACTIVE`
-- `CLOSED`
-
-The backend verifies event ownership and validates the transition.
-
-### 6.4 Submit Vote
+### 6.5 Submit Vote
 
 **POST `/api/polls/:id/votes`**
 
@@ -448,18 +482,14 @@ The backend must verify:
 
 - The poll exists and is active.
 - The selected option belongs to that poll.
+- The poll's event is active.
 - The voter key is valid and within the expected length.
 - The same voter key has not already voted in that poll.
 
 The database unique constraint is the final protection against duplicate submissions using the same key.
 
-### 6.5 Get Poll Results
-
-**GET `/api/polls/:id/results`**
-
-Authentication: Required for the creator-facing results endpoint.
-
-Returns the available options and vote counts.
+Successful voting returns the updated poll results. A repeated voter key
+returns `409 Conflict` with `DUPLICATE_VOTE`.
 
 Public results can be exposed separately if the product requirements later call for them.
 
@@ -509,6 +539,8 @@ Suggested error codes:
 | `INVALID_STATUS_TRANSITION` | Requested state change is not allowed |
 | `DUPLICATE_VOTE`            | Participant key has already voted     |
 | `RATE_LIMIT_EXCEEDED`       | Too many requests                     |
+| `USERNAME_ALREADY_EXISTS`  | Registration username is already used |
+| `ACTIVE_POLL_EXISTS`       | Event already has an active poll      |
 | `INTERNAL_ERROR`            | Unexpected server error               |
 
 Error messages should be understandable to the frontend without exposing internal details.
@@ -522,6 +554,12 @@ Error messages should be understandable to the frontend without exposing interna
 - Never trust frontend-only permission checks.
 - Do not expose pending or rejected questions publicly.
 - Apply rate limiting to public question submission and login.
+- Apply in-memory limits by client IP: 10 registration/login attempts per
+  15 minutes, 5 question submissions per 10 minutes, and 20 vote attempts per
+  10 minutes. Counters reset when the single backend process restarts.
+- In the local Compose topology, Vite forwards the client address to the
+  backend. The backend trusts one proxy hop, and its host port is bound to
+  loopback so clients reach public APIs through the frontend proxy.
 - Use parameterised database queries or a safe database library.
 - Configure CORS and cookie settings appropriately for the deployment.
 - Avoid logging passwords, authentication tokens, or other sensitive credentials.
@@ -545,7 +583,9 @@ At minimum, test the following scenarios:
 13. Unauthenticated users cannot access moderation endpoints.
 14. Invalid request bodies return consistent validation errors.
 
-Optional poll tests should cover poll ownership, active-state checks, option validation, and duplicate-vote prevention.
+Poll tests must cover ownership, active-event and active-poll checks, option
+validation, one-active-poll enforcement, public results, and duplicate-vote
+prevention.
 
 ## 11. API Design Completion Criteria
 
@@ -558,4 +598,7 @@ The API design is considered implemented when:
 - Validation and error handling are consistent.
 - Question lifecycle rules are enforced by the backend.
 - Core API behaviour is covered by automated tests.
-- Optional poll endpoints are only implemented if time permits.
+- Poll endpoints enforce ownership, status transitions, one-active-poll
+  rules, and duplicate-vote constraints.
+- Public question and poll updates are delivered through Socket.IO as
+  notifications, with REST as the source of truth.

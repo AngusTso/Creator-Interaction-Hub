@@ -34,7 +34,11 @@ function parsePublicCode(value: string): string {
   return value;
 }
 
-export function createEventsRouter(database: Pool, tokenSecret: Uint8Array): Router {
+export function createEventsRouter(
+  database: Pool,
+  tokenSecret: Uint8Array,
+  notifyEventUpdated?: (eventId: string) => void,
+): Router {
   const router = Router();
   const authenticate = createAuthenticate(tokenSecret);
 
@@ -75,6 +79,7 @@ export function createEventsRouter(database: Pool, tokenSecret: Uint8Array): Rou
       id,
       status,
     );
+    notifyEventUpdated?.(event.id);
 
     response.status(200).json({ success: true, data: { event } });
   });

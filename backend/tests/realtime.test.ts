@@ -11,6 +11,7 @@ import {
   vi,
 } from 'vitest';
 import {
+  audienceRoom,
   createRealtimeServer,
   moderationRoom,
 } from '../src/realtime/server.js';
@@ -22,6 +23,7 @@ const ownerId = 'c0c6a9ec-a6c6-4e50-8ff0-9f43f9270245';
 const otherCreatorId = '0bf2c2bf-64fb-41d8-918c-f72ad4399a43';
 const ownedEventId = '9322ea6e-943e-44be-bc2d-7b08f30d197d';
 const otherEventId = 'e84657a1-c43e-4675-95fc-d10c5e155c37';
+const publicCode = 'a'.repeat(32);
 
 async function createToken(creatorId: string): Promise<string> {
   return new SignJWT({ username: 'test-creator' })
@@ -46,11 +48,15 @@ describe('moderator Socket.IO access', () => {
     async (creatorId: string, eventId: string) =>
       creatorId === ownerId && eventId === ownedEventId,
   );
+  const getPublicEventId = vi.fn(
+    async (code: string) => code === publicCode ? ownedEventId : null,
+  );
   const httpServer = createServer();
   const realtime = createRealtimeServer(
     httpServer,
     tokenSecret,
     canModerateEvent,
+    getPublicEventId,
   );
   let serverUrl: string;
 
@@ -69,6 +75,7 @@ describe('moderator Socket.IO access', () => {
 
   beforeEach(() => {
     canModerateEvent.mockClear();
+    getPublicEventId.mockClear();
   });
 
   afterAll(async () => {
@@ -77,7 +84,7 @@ describe('moderator Socket.IO access', () => {
     });
   });
 
-  it('rejects unauthenticated socket connections', async () => {
+  it('rejects a socket connection with an invalid access token', async () => {
     const socket = connect(serverUrl, {
       auth: { token: 'invalid-token' },
       reconnection: false,
@@ -157,6 +164,57 @@ describe('moderator Socket.IO access', () => {
         otherCreatorId,
         ownedEventId,
       );
+    } finally {
+      socket.disconnect();
+    }
+  });
+
+  it('allows public audience rooms by public code, but not moderator rooms', async () => {
+    const socket = connect(serverUrl, {
+      reconnection: false,
+      transports: ['websocket'],
+    });
+
+    try {
+      await waitForSocketEvent<void>(socket, 'connect');
+      const joinedEvent = waitForSocketEvent<{ publicCode: string }>(
+        socket,
+        'audience:joined',
+      );
+      socket.emit('audience:join', publicCode);
+      expect(await joinedEvent).toEqual({ publicCode });
+      expect(getPublicEventId).toHaveBeenCalledWith(publicCode);
+      expect(audienceRoom(ownedEventId)).toBe(`event:${ownedEventId}:audience`);
+
+      const denied = waitForSocketEvent<{ message: string }>(
+        socket,
+        'moderation:error',
+      );
+      socket.emit('moderation:join', ownedEventId);
+      expect(await denied).toEqual({
+        message: 'You cannot access this event.',
+      });
+
+      const questionStatus = waitForSocketEvent<{ eventId: string }>(
+        socket,
+        'question:status',
+      );
+      realtime.notifyQuestionStatusChanged(ownedEventId);
+      expect(await questionStatus).toEqual({ eventId: ownedEventId });
+
+      const eventUpdate = waitForSocketEvent<{ eventId: string }>(
+        socket,
+        'event:updated',
+      );
+      realtime.notifyEventUpdated(ownedEventId);
+      expect(await eventUpdate).toEqual({ eventId: ownedEventId });
+
+      const pollUpdate = waitForSocketEvent<{ eventId: string }>(
+        socket,
+        'poll:updated',
+      );
+      realtime.notifyPollUpdated(ownedEventId);
+      expect(await pollUpdate).toEqual({ eventId: ownedEventId });
     } finally {
       socket.disconnect();
     }

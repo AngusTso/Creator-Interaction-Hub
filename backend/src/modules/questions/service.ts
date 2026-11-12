@@ -168,14 +168,20 @@ export async function updateQuestionStatus(
   creatorId: string,
   questionId: string,
   requestedStatus: QuestionStatus,
-): Promise<{ id: string; status: QuestionStatus; updatedAt: Date }> {
+): Promise<{
+  id: string;
+  status: QuestionStatus;
+  eventId: string;
+  updatedAt: Date;
+}> {
   return withTransaction(database, async (client) => {
     const currentResult = await client.query<{
       id: string;
       status: QuestionStatus;
       creator_id: string;
+      event_id: string;
     }>(
-      `SELECT q.id, q.status, e.creator_id
+      `SELECT q.id, q.status, q.event_id, e.creator_id
        FROM questions q
        JOIN events e ON e.id = q.event_id
        WHERE q.id = $1
@@ -220,6 +226,7 @@ export async function updateQuestionStatus(
     return {
       id: updated.id,
       status: updated.status,
+      eventId: current.event_id,
       updatedAt: updated.updated_at,
     };
   });

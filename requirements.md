@@ -27,12 +27,14 @@ Creator Interaction Hub provides a separate, lightweight interface to manage thi
 The MVP should:
 
 1. Allow creators to create and manage livestream events.
-2. Allow audiences to submit questions without registering an account.
-3. Allow moderators to review and manage submitted questions.
-4. Display approved questions to the public.
-5. Persist application data in PostgreSQL.
-6. Provide a straightforward Docker Compose setup.
-7. Demonstrate clear architecture, maintainable code, and meaningful tests.
+2. Allow creators to register and authenticate.
+3. Allow audiences to submit questions without registering an account.
+4. Allow moderators to review and manage submitted questions.
+5. Display approved questions to the public and update them in real time.
+6. Provide audience polls and voting.
+7. Persist application data in PostgreSQL.
+8. Provide a straightforward Docker Compose setup.
+9. Demonstrate clear architecture, maintainable code, and meaningful tests.
 
 ## 4. Non-Goals
 
@@ -41,7 +43,6 @@ The following are explicitly outside the MVP scope:
 - Hosting or streaming video.
 - Integrating with YouTube, Twitch, or other streaming providers.
 - Replacing existing livestream chat.
-- Audience registration and account management.
 - Payments or subscriptions.
 - Social networking features.
 - AI-powered moderation.
@@ -61,7 +62,7 @@ An authenticated user who can:
 - View submitted questions.
 - Approve or reject questions.
 - Mark approved questions as answered.
-- Optionally create and manage polls.
+- Create and manage polls.
 
 For the MVP, a creator can also perform moderation. Separate moderator roles are unnecessary.
 
@@ -73,7 +74,7 @@ An unauthenticated visitor who can:
 - View event information.
 - Submit questions while the event is active.
 - View approved and answered questions.
-- Optionally participate in active polls.
+- Participate in active polls and view results from closed polls.
 
 Audience members do not need accounts.
 
@@ -89,12 +90,16 @@ Priority definitions:
 
 **Priority: Must**
 
-- Creators must be able to authenticate.
+- Creators must be able to register and authenticate.
 - Passwords must be stored as secure hashes.
+- Registration uses a unique, normalized username and a password of at least
+  12 characters. Passwords must not exceed bcrypt's 72-byte input limit.
+- Successful registration creates an authenticated session.
 - Protected endpoints must reject unauthenticated requests.
 - Invalid credentials must return an appropriate error.
 
-No public registration workflow is required. A demo creator account can be seeded for evaluation.
+A demo creator account can also be seeded for evaluation. Each creator can
+manage only their own events.
 
 ### FR-02: Event Management
 
@@ -143,7 +148,8 @@ Requirements:
 - Submitted questions must be persisted in PostgreSQL.
 - New questions must initially have `PENDING` status.
 - Invalid or empty submissions must be rejected.
-- Basic rate limiting should be implemented if time permits.
+- Limit public submissions to 5 requests per client IP per 10 minutes.
+- Rate limit errors must use the standard API error envelope.
 
 ### FR-05: Question Moderation
 
@@ -188,14 +194,13 @@ A creator must not be able to moderate questions belonging to another creator's 
 
 ### FR-07: Real-Time Notifications
 
-**Priority: Should**
-
-If time permits, implement real-time notifications using Socket.IO.
+**Priority: Must**
 
 Expected behaviour:
 
 - Moderators receive a notification when a new question is submitted.
-- The frontend updates relevant question information without requiring a manual refresh.
+- Audience pages receive question-status and event-status notifications and
+  refresh authoritative data without requiring a manual refresh.
 - Reconnecting clients retrieve the latest state through REST APIs.
 
 PostgreSQL remains the source of truth. Real-time events are notifications, not authoritative data.
@@ -206,8 +211,6 @@ If implementation time becomes limited, a working REST-based refresh mechanism i
 
 **Priority: Could**
 
-If the core MVP is complete, add basic audience polls.
-
 Creators can:
 
 - Create a poll with a question and multiple options.
@@ -217,20 +220,25 @@ Creators can:
 
 Audience members can:
 
-- View active polls.
+- View active polls and results from closed polls.
 - Vote for one option.
-- View poll results.
+- See current vote counts and percentages while voting is open.
 
 Additional rules:
 
 - A poll must belong to an event.
-- Only active polls accept votes.
+- Only active polls on active events accept votes.
+- An event can have at most one active poll at a time.
+- Poll options must be distinct; each poll has between 2 and 6 options.
 - A participant should only be able to vote once per poll.
-- A browser-issued participant key can be used as a basic duplicate-vote deterrent.
+- A browser-issued participant key stored in local storage can be used as a
+  basic duplicate-vote deterrent.
 
-The participant key does not provide reliable identity verification.
+The participant key does not provide reliable identity verification. Clearing
+browser storage or using another browser/device allows another vote.
 
-Polls must not delay or compromise the core Q&A workflow.
+Poll results are public while the poll is active and remain available after it
+closes. Ending an event automatically closes its active poll.
 
 ## 7. Non-Functional Requirements
 
@@ -258,6 +266,10 @@ Polls must not delay or compromise the core Q&A workflow.
 - Validate incoming data.
 - Avoid exposing internal errors or sensitive database fields.
 - Store secrets in environment variables.
+- Apply in-memory, per-client-IP rate limits to registration/login, public
+  question submission, and poll voting. Counters reset when the backend
+  restarts; this is appropriate for the single-instance local Docker
+  deployment and is not a distributed production limiter.
 
 ### NFR-04: API Consistency
 
@@ -344,6 +356,13 @@ The core MVP is considered functionally complete when:
 11. Unauthorised users cannot perform moderation actions.
 12. The application can be started using the documented Docker Compose workflow.
 13. Important backend business rules have automated tests.
+14. A creator can register without a pre-seeded account.
+15. Audience question status updates arrive without manual refresh when
+    Socket.IO is connected, with REST refresh as recovery.
+16. Creators can create and manage polls; audiences can vote once per browser
+    key and view public active and closed results.
+17. Registration, login, question submission, and voting return `429` when
+    their configured rate limit is exceeded.
 
 Polls and real-time notifications are not required for core MVP acceptance.
 

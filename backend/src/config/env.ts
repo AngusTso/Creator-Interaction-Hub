@@ -14,3 +14,17 @@ export function getJwtSecret(): Uint8Array {
 
   return new TextEncoder().encode(secret);
 }
+
+export function getTrustProxyHops(): number {
+  const configuredHops = process.env.TRUST_PROXY_HOPS;
+  if (configuredHops === undefined) {
+    return 0;
+  }
+
+  const hops = Number(configuredHops);
+  if (!Number.isInteger(hops) || hops < 0) {
+    throw new Error('TRUST_PROXY_HOPS must be a non-negative integer.');
+  }
+
+  return hops;
+}

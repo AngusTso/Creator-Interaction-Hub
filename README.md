@@ -4,12 +4,15 @@ Creator Interaction Hub is a lightweight audience Q&A tool that runs alongside
 an existing livestream. It helps creators organise audience questions; it is
 not a streaming platform or a replacement for livestream chat.
 
-The application supports creator login, event management, public event access,
-audience question submission, moderation, and public approved-question display.
-The frontend provides creator login and event management, question moderation,
-and the public participation page. The moderator queue receives real-time
-notifications for new questions and refreshes authoritative data through REST.
-Polls are not implemented.
+The application supports creator self-registration and login, event
+management, audience question submission, moderation, polls, and public
+approved-question display. Moderators receive real-time new-question
+notifications. Open audience pages receive question, event, and poll update
+notifications and reload authoritative data through REST.
+
+Audiences do not need accounts. Poll votes use a browser-generated key stored
+in local storage to discourage repeat votes in the same browser; clearing
+storage or switching devices bypasses this check.
 
 The frontend uses modular plain CSS and locally bundled Inter, Space Grotesk,
 and JetBrains Mono fonts. It does not use Tailwind CSS or a component library;
@@ -36,6 +39,7 @@ overrides them to connect to its `db` service.
 | `POSTGRES_USER` | PostgreSQL user | `creator_hub` |
 | `POSTGRES_PASSWORD` | Local PostgreSQL password | Replace before starting |
 | `API_PORT` | Host port for the backend | `3000` |
+| `API_BIND_ADDRESS` | Host address for the backend API port | `127.0.0.1` |
 | `FRONTEND_PORT` | Host port for the frontend | `5173` |
 | `POSTGRES_PORT` | Host port for the Compose PostgreSQL service | `5432` |
 | `JWT_SECRET` | Secret used to sign access tokens | Replace before starting |
@@ -66,24 +70,35 @@ password.
 The API is available at `http://localhost:3000/api`:
 
 - `POST /auth/login`
+- `POST /auth/register`
 - `POST /events`, `GET /events`, `GET /events/:id`
 - `PATCH /events/:id/status`
+- `POST /events/:id/polls`, `GET /events/:id/polls`
+- `PATCH /polls/:id/status`, `POST /polls/:id/votes`
 - `GET /public/events/:publicCode`
 - `POST /public/events/:publicCode/questions`
 - `GET /public/events/:publicCode/questions`
+- `GET /public/events/:publicCode/polls`
 - `GET /events/:id/questions`
 - `PATCH /questions/:id/status`
 
 Creator endpoints require the bearer token returned by login. Event lifecycle
-transitions are `DRAFT → ACTIVE → ENDED`; audience questions are accepted only
-while an event is active. Login tokens expire after 15 minutes and there is no
-refresh-token endpoint.
+transitions are `DRAFT → ACTIVE → ENDED`; questions and poll voting are
+accepted only while the event is active. A poll has 2–6 distinct options and
+only one poll per event can be active. Results are public while the poll is
+active and remain available after it closes. Ending an event closes its active
+poll. Login tokens expire after 15 minutes and there is no refresh-token
+endpoint.
 
-Basic request validation and ownership checks are implemented. Per-IP rate
-limiting is deferred; proxy-aware rate limits need a deliberate configuration
-because browser API requests pass through the Vite proxy in development.
-The public audience page still requires manual refresh to see later question
-status changes.
+In-memory per-IP limits apply to registration/login (10 per 15 minutes),
+question submissions (5 per 10 minutes), and poll votes (20 per 10 minutes).
+Counters reset when the backend restarts. The backend API host port is bound
+to loopback; browser calls go through Vite, which forwards the client address
+to the backend for local rate limiting. This setup is for the single-instance
+local Docker app, not production-scale abuse protection.
+
+The seeded demo creator remains available alongside self-registration. There
+is no email verification or account recovery flow.
 
 ## Run checks
 

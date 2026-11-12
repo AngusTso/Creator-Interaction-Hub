@@ -4,7 +4,8 @@
 
 Creator Interaction Hub uses **PostgreSQL** as its primary relational database.
 
-The database stores creator accounts, events, audience questions, and optional poll-related data.
+The database stores creator accounts, events, audience questions, polls, poll
+options, and votes.
 
 The design prioritises:
 
@@ -87,7 +88,7 @@ erDiagram
     }
 ```
 
-The poll entities are included as an extension to the core model. They are not required for the initial Q&A workflow.
+Polls, options, and votes are part of the Milestone 5 application schema.
 
 ## 3. Table Definitions
 
@@ -106,8 +107,9 @@ Username format constraint: must be lowercase, trimmed, and between 1 and 100 ch
 
 Notes:
 
-- Public creator registration is outside the MVP scope.
-- A demo creator account can be seeded for evaluation.
+- Creator registration is public; usernames are normalized to lowercase and
+  unique.
+- A demo creator account can also be seeded for evaluation.
 - Passwords must never be stored in plaintext.
 - Authentication credentials must not be exposed through public APIs.
 
@@ -194,7 +196,7 @@ Migrations are executed inside a transaction alongside the schema change, so a m
 
 ## 4. Optional Poll Tables
 
-The following tables are only needed if poll functionality is implemented after the core Q&A workflow.
+The following tables store poll data.
 
 ### 4.1 Polls
 
@@ -204,14 +206,18 @@ The following tables are only needed if poll functionality is implemented after 
 | event_id | UUID | Foreign key, not null | Associated event |
 | title | VARCHAR(200) | Not null | Poll question or title |
 | status | VARCHAR(20) | Not null | Poll lifecycle status |
-| created_at | TIMESTAMP | Not null | Creation time |
-| updated_at | TIMESTAMP | Not null | Last update time |
+| created_at | TIMESTAMPTZ | Not null, default `NOW()` | Creation time |
+| updated_at | TIMESTAMPTZ | Not null, default `NOW()` | Last update time |
 
 Allowed statuses:
 
 - `DRAFT`
 - `ACTIVE`
 - `CLOSED`
+
+An event can have at most one active poll. A partial unique index on
+`polls(event_id) WHERE status = 'ACTIVE'` enforces this even if application
+requests race.
 
 ### 4.2 PollOptions
 
@@ -220,8 +226,11 @@ Allowed statuses:
 | id | UUID | Primary key | Unique option identifier |
 | poll_id | UUID | Foreign key, not null | Associated poll |
 | option_text | VARCHAR(200) | Not null | Option label |
+| position | INTEGER | Not null, non-negative | Display order |
 
-A poll contains multiple options. Each option belongs to one poll.
+A poll contains 2–6 distinct options. Each option belongs to one poll. The
+backend validates the count and case-insensitive distinctness when creating
+the poll. A unique `(poll_id, id)` key supports the vote option relationship.
 
 ### 4.3 Votes
 
@@ -231,13 +240,15 @@ A poll contains multiple options. Each option belongs to one poll.
 | poll_id | UUID | Foreign key, not null | Associated poll |
 | option_id | UUID | Foreign key, not null | Selected option |
 | voter_key | VARCHAR(128) | Not null | Browser-issued participant key |
-| created_at | TIMESTAMP | Not null | Vote submission time |
+| created_at | TIMESTAMPTZ | Not null, default `NOW()` | Vote submission time |
 
 Important constraints:
 
 - A unique constraint on `(poll_id, voter_key)` prevents the same browser-issued key from voting multiple times in one poll.
-- The selected option must belong to the same poll as the vote.
-- Votes are accepted only while the poll is active.
+- A composite foreign key `(poll_id, option_id)` references the same pair on
+  `poll_options`, ensuring the selected option belongs to that poll.
+- A unique `(poll_id, position)` constraint preserves option order.
+- Votes are accepted only while both the poll and its event are active.
 
 The browser-issued key is only a basic duplicate-vote deterrent. It is not reliable identity verification and can be bypassed by clearing browser data or using another browser/device.
 
@@ -279,9 +290,12 @@ For the MVP, deletion behaviour is enforced by foreign keys:
 | Questions | Check status valid | Must be `PENDING`, `APPROVED`, `REJECTED`, or `ANSWERED` |
 | Questions | Check display_name not empty | Trimmed name must be 1–80 characters |
 | Questions | Check content not empty | Trimmed content must be 1–2000 characters |
+| Polls | Partial unique index on event_id where status is ACTIVE | At most one active poll per event |
+| Poll options | Unique poll_id + position | Preserve option display order |
 | Votes | Unique poll_id + voter_key | Prevent duplicate votes using the same key |
 
-For optional polls, use a composite foreign key or equivalent database/application validation to ensure that the selected option belongs to the specified poll.
+Use a composite foreign key to ensure that the selected option belongs to the
+specified poll.
 
 ### 6.2 Recommended indexes
 
@@ -292,6 +306,7 @@ For optional polls, use a composite foreign key or equivalent database/applicati
 | Events | Index `events_creator_id_idx` on creator_id | Retrieve a creator's events |
 | Questions | Composite index `questions_event_status_created_idx` on (event_id, status, created_at) | Retrieve and filter event questions efficiently |
 | Polls | Index on event_id | Retrieve polls belonging to an event |
+| Polls | Partial unique index on event_id where status is ACTIVE | At most one active poll per event |
 | Votes | Unique index on (poll_id, voter_key) | Enforce duplicate-vote protection |
 
 The composite question index supports the moderator dashboard, which commonly retrieves questions for a particular event filtered by status and ordered by submission time.
@@ -324,15 +339,16 @@ The backend should:
 
 A conditional update can help prevent conflicting status changes from concurrent requests.
 
-### 7.3 Poll creation and voting (optional)
+### 7.3 Poll creation and voting
 
 If polls are implemented:
 
 - Creating a poll and its options should be atomic.
-- Voting should validate that the poll is active.
+- Only active events can have an active poll accept votes.
 - Voting should validate that the selected option belongs to that poll.
 - A unique constraint on `(poll_id, voter_key)` should enforce duplicate-vote protection.
 - The backend should handle uniqueness conflicts gracefully.
+- Ending an event closes its active poll in the same transaction.
 
 ## 8. Data Access and API Exposure
 
@@ -387,4 +403,4 @@ The database design is considered implemented when:
 - Database migrations can initialise a clean database.
 - Seed data supports the demo workflow.
 - Core application data persists after restarting Docker Compose.
-- Optional poll tables are only introduced if poll functionality is implemented.
+- Poll tables, constraints, and indexes are installed by a versioned migration.

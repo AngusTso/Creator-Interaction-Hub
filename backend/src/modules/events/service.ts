@@ -169,6 +169,15 @@ export async function updateEventStatus(
       [requestedStatus, eventId],
     );
 
+    if (requestedStatus === 'ENDED') {
+      await client.query(
+        `UPDATE polls
+         SET status = 'CLOSED', updated_at = NOW()
+         WHERE event_id = $1 AND status = 'ACTIVE'`,
+        [eventId],
+      );
+    }
+
     return toEventResponse(updatedResult.rows[0]);
   });
 }

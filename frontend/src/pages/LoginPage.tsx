@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { getErrorMessage, login } from '../services/api';
+import { getErrorMessage, login, registerCreator } from '../services/api';
 import type { Creator } from '../types';
 
 interface Props {
@@ -10,6 +10,7 @@ interface Props {
 export default function LoginPage({ notice, onLogin }: Props) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -19,7 +20,9 @@ export default function LoginPage({ notice, onLogin }: Props) {
     setIsSubmitting(true);
 
     try {
-      const result = await login(username.trim(), password);
+      const result = isRegistering
+        ? await registerCreator(username.trim(), password)
+        : await login(username.trim(), password);
       onLogin(result.user, result.accessToken);
     } catch (requestError) {
       setError(getErrorMessage(requestError, 'Unable to sign in.'));
@@ -36,8 +39,12 @@ export default function LoginPage({ notice, onLogin }: Props) {
           <span className="brand-name">CREATOR / INTERACTION HUB</span>
         </a>
         <p className="eyebrow">CREATOR ACCESS / 01</p>
-        <h1 id="login-title">SIGN IN.</h1>
-        <p className="body-copy">Sign in to create events and moderate questions.</p>
+        <h1 id="login-title">{isRegistering ? 'CREATE ACCOUNT.' : 'SIGN IN.'}</h1>
+        <p className="body-copy">
+          {isRegistering
+            ? 'Create a creator account to manage your events.'
+            : 'Sign in to create events and moderate questions.'}
+        </p>
 
         {notice && <p className="notice" role="status">{notice}</p>}
         {error && <p className="message message--error" role="alert">{error}</p>}
@@ -56,7 +63,8 @@ export default function LoginPage({ notice, onLogin }: Props) {
           <label className="field">
             <span>PASSWORD</span>
             <input
-              autoComplete="current-password"
+              autoComplete={isRegistering ? 'new-password' : 'current-password'}
+              minLength={isRegistering ? 12 : undefined}
               onChange={(event) => setPassword(event.target.value)}
               required
               type="password"
@@ -64,11 +72,27 @@ export default function LoginPage({ notice, onLogin }: Props) {
             />
           </label>
           <button className="button button--primary button--wide" disabled={isSubmitting}>
-            {isSubmitting ? 'SIGNING IN…' : 'SIGN IN'}
+            {isSubmitting
+              ? (isRegistering ? 'CREATING…' : 'SIGNING IN…')
+              : (isRegistering ? 'CREATE ACCOUNT' : 'SIGN IN')}
           </button>
         </form>
 
-        <p className="fine-print">CREATOR ACCOUNT REQUIRED / NO PUBLIC SIGN-UP</p>
+        <p className="fine-print">
+          {isRegistering
+            ? 'PASSWORD / 12 CHARACTERS MINIMUM'
+            : 'CREATOR ACCOUNT / DEMO ACCESS AVAILABLE'}
+        </p>
+        <button
+          className="text-button auth-mode-toggle"
+          onClick={() => {
+            setIsRegistering((current) => !current);
+            setError(null);
+          }}
+          type="button"
+        >
+          {isRegistering ? 'HAVE AN ACCOUNT? SIGN IN' : 'NEW CREATOR? SIGN UP'}
+        </button>
       </section>
     </main>
   );

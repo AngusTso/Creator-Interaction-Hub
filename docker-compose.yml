@@ -21,6 +21,7 @@ services:
       context: ./backend
     environment:
       PORT: 3000
+      TRUST_PROXY_HOPS: 1
       PGHOST: db
       PGPORT: 5432
       PGDATABASE: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
@@ -30,7 +31,7 @@ services:
       SEED_CREATOR_USERNAME: ${SEED_CREATOR_USERNAME:?Set SEED_CREATOR_USERNAME in .env}
       SEED_CREATOR_PASSWORD: ${SEED_CREATOR_PASSWORD:?Set SEED_CREATOR_PASSWORD in .env}
     ports:
-      - "${API_PORT:-3000}:3000"
+      - "${API_BIND_ADDRESS:-127.0.0.1}:${API_PORT:-3000}:3000"
     depends_on:
       db:
         condition: service_healthy

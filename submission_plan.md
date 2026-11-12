@@ -35,8 +35,10 @@ The project focuses on organising audience questions that might otherwise be bur
 5. Creator reviews and moderates submissions.
 6. Approved questions become visible to the audience.
 7. Creator can mark questions as answered.
+8. Creator can register and manage polls; the audience can vote and see results.
 
-Polls and real-time notifications are optional extensions, not requirements for a successful MVP.
+Polls and real-time audience updates are planned for Milestone 5. Final review
+and submission materials are planned for Milestone 6.
 
 ## 3. Technology Stack
 
@@ -155,7 +157,9 @@ Before submission, the developer verifies:
 | 1. Foundation                  | Set up frontend, backend, database, and Docker              | Application environment runs        |
 | 2. Backend Core                | Implement authentication, events, questions, and moderation | Core API and business rules work    |
 | 3. Frontend Integration        | Build creator and audience interfaces                       | Complete Q&A workflow               |
-| 4. Verification and Submission | Test, review, fix, document, and prepare repository         | Runnable and explainable submission |
+| 4. Verification                | Verify the MVP and moderator real-time updates               | Verified core Q&A workflow            |
+| 5. Interaction Features        | Signup, audience updates, polls, voter keys, rate limits      | Complete local Docker application     |
+| 6. Final Review and Submission | Address Cline findings and prepare accurate submission docs  | Reviewed and explainable submission   |
 
 The core Q&A workflow takes priority over optional functionality.
 

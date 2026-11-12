@@ -47,4 +47,30 @@ describe('LoginPage', () => {
     );
     expect(screen.getByLabelText(/USERNAME/)).toHaveValue('streamer');
   });
+
+  it('registers a creator and returns the new session', async () => {
+    const registration = vi.spyOn(api, 'registerCreator').mockResolvedValue({
+      user: { id: 'creator-2', username: 'new_creator' },
+      accessToken: 'new-token',
+    });
+    const onLogin = vi.fn();
+    const user = userEvent.setup();
+
+    render(<LoginPage onLogin={onLogin} />);
+    await user.click(screen.getByRole('button', { name: 'NEW CREATOR? SIGN UP' }));
+    await user.type(screen.getByLabelText('USERNAME'), 'new_creator');
+    await user.type(screen.getByLabelText('PASSWORD'), 'a-long-password');
+    await user.click(screen.getByRole('button', { name: 'CREATE ACCOUNT' }));
+
+    await waitFor(() => {
+      expect(registration).toHaveBeenCalledWith(
+        'new_creator',
+        'a-long-password',
+      );
+      expect(onLogin).toHaveBeenCalledWith(
+        { id: 'creator-2', username: 'new_creator' },
+        'new-token',
+      );
+    });
+  });
 });

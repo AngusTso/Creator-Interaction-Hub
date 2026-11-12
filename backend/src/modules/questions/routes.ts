@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import { z } from 'zod';
 import type { Pool } from 'pg';
 import { createAuthenticate, getAuthenticatedUser } from '../../middleware/authenticate.js';
@@ -25,8 +25,8 @@ const submitQuestionSchema = z.object({
   content: z.string().trim().min(1).max(2000),
 }).strict();
 
-function parsePublicCode(value: string): string {
-  if (!publicCodePattern.test(value)) {
+function parsePublicCode(value: unknown): string {
+  if (typeof value !== 'string' || !publicCodePattern.test(value)) {
     throw new ApiError(404, 'NOT_FOUND', 'Event not found.');
   }
 
@@ -36,27 +36,33 @@ function parsePublicCode(value: string): string {
 export function createQuestionsRouter(
   database: Pool,
   tokenSecret: Uint8Array,
+  questionSubmissionLimiter: RequestHandler,
   notifyQuestionSubmitted?: (eventId: string) => void,
+  notifyQuestionStatusChanged?: (eventId: string) => void,
 ): Router {
   const router = Router();
   const authenticate = createAuthenticate(tokenSecret);
 
-  router.post('/public/events/:publicCode/questions', async (request, response) => {
-    const publicCode = parsePublicCode(request.params.publicCode);
-    const input = parseInput(submitQuestionSchema, request.body);
-    const submission = await submitQuestion(
-      database,
-      publicCode,
-      input.displayName,
-      input.content,
-    );
-    notifyQuestionSubmitted?.(submission.eventId);
+  router.post(
+    '/public/events/:publicCode/questions',
+    questionSubmissionLimiter,
+    async (request, response) => {
+      const publicCode = parsePublicCode(request.params.publicCode);
+      const input = parseInput(submitQuestionSchema, request.body);
+      const submission = await submitQuestion(
+        database,
+        publicCode,
+        input.displayName,
+        input.content,
+      );
+      notifyQuestionSubmitted?.(submission.eventId);
 
-    response.status(201).json({
-      success: true,
-      data: { question: submission.question },
-    });
-  });
+      response.status(201).json({
+        success: true,
+        data: { question: submission.question },
+      });
+    },
+  );
 
   router.get('/public/events/:publicCode/questions', async (request, response) => {
     const publicCode = parsePublicCode(request.params.publicCode);
@@ -77,14 +83,24 @@ export function createQuestionsRouter(
     const { id } = parseInput(questionIdSchema, request.params);
     const { status } = parseInput(statusSchema, request.body);
     const user = getAuthenticatedUser(request);
-    const question = await updateQuestionStatus(
+    const updatedQuestion = await updateQuestionStatus(
       database,
       user.id,
       id,
       status,
     );
+    notifyQuestionStatusChanged?.(updatedQuestion.eventId);
 
-    response.status(200).json({ success: true, data: { question } });
+    response.status(200).json({
+      success: true,
+      data: {
+        question: {
+          id: updatedQuestion.id,
+          status: updatedQuestion.status,
+          updatedAt: updatedQuestion.updatedAt,
+        },
+      },
+    });
   });
 
   return router;

@@ -1,5 +1,6 @@
 export type EventStatus = 'DRAFT' | 'ACTIVE' | 'ENDED';
 export type QuestionStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'ANSWERED';
+export type PollStatus = 'DRAFT' | 'ACTIVE' | 'CLOSED';
 
 export interface Creator {
   id: string;
@@ -39,4 +40,21 @@ export interface PublicQuestion {
   content: string;
   status: 'APPROVED' | 'ANSWERED';
   createdAt: string;
+}
+
+export interface PollOption {
+  id: string;
+  text: string;
+  votes: number;
+  percentage: number;
+}
+
+export interface Poll {
+  id: string;
+  title: string;
+  status: PollStatus;
+  options: PollOption[];
+  totalVotes: number;
+  createdAt: string;
+  updatedAt: string;
 }

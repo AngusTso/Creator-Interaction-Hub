@@ -3,6 +3,8 @@ import type {
   Event,
   EventStatus,
   ModerationQuestion,
+  Poll,
+  PollStatus,
   PublicEvent,
   PublicQuestion,
   QuestionStatus,
@@ -117,6 +119,23 @@ export async function login(
   return { user: data.user, accessToken: data.accessToken };
 }
 
+export async function registerCreator(
+  username: string,
+  password: string,
+): Promise<{ user: Creator; accessToken: string }> {
+  const data = await request<{
+    user: Creator;
+    accessToken: string;
+    tokenType: 'Bearer';
+    expiresIn: number;
+  }>('/api/auth/register', {
+    method: 'POST',
+    body: { username, password },
+  });
+
+  return { user: data.user, accessToken: data.accessToken };
+}
+
 export async function listEvents(accessToken: string): Promise<Event[]> {
   const data = await request<{ events: Event[] }>('/api/events', { accessToken });
   return data.events;
@@ -207,4 +226,60 @@ export async function updateQuestionStatus(
     body: { status },
   });
   return data.question;
+}
+
+export async function listCreatorPolls(
+  accessToken: string,
+  eventId: string,
+): Promise<Poll[]> {
+  const data = await request<{ polls: Poll[] }>(`/api/events/${eventId}/polls`, {
+    accessToken,
+  });
+  return data.polls;
+}
+
+export async function createPoll(
+  accessToken: string,
+  eventId: string,
+  title: string,
+  options: string[],
+): Promise<Poll> {
+  const data = await request<{ poll: Poll }>(`/api/events/${eventId}/polls`, {
+    accessToken,
+    method: 'POST',
+    body: { title, options },
+  });
+  return data.poll;
+}
+
+export async function updatePollStatus(
+  accessToken: string,
+  pollId: string,
+  status: Exclude<PollStatus, 'DRAFT'>,
+): Promise<Poll> {
+  const data = await request<{ poll: Poll }>(`/api/polls/${pollId}/status`, {
+    accessToken,
+    method: 'PATCH',
+    body: { status },
+  });
+  return data.poll;
+}
+
+export async function listPublicPolls(publicCode: string): Promise<Poll[]> {
+  const data = await request<{ polls: Poll[] }>(
+    `/api/public/events/${publicCode}/polls`,
+  );
+  return data.polls;
+}
+
+export async function submitPollVote(
+  pollId: string,
+  optionId: string,
+  voterKey: string,
+): Promise<Poll> {
+  const data = await request<{ poll: Poll }>(`/api/polls/${pollId}/votes`, {
+    method: 'POST',
+    body: { optionId, voterKey },
+  });
+  return data.poll;
 }
