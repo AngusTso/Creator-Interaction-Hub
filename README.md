@@ -18,6 +18,12 @@ The frontend uses modular plain CSS and locally bundled Inter, Space Grotesk,
 and JetBrains Mono fonts. It does not use Tailwind CSS or a component library;
 see [frontend_design.md](./frontend_design.md) for the visual rules.
 
+## Submission overview
+
+- [Quick start](./submission-quickstart.md) — clone and run the project.
+- [AI-assisted workflow](./ai-workflow.md) — roles, review process, and time estimate.
+- [Architecture overview](./architecture-overview.md) — diagram and key decisions.
+
 ## Prerequisites
 
 - Docker Engine or Docker Desktop with Docker Compose

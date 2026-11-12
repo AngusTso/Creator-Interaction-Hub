@@ -25,7 +25,8 @@ The core database consists of three entities:
 - `Events`
 - `Questions`
 
-Poll-related entities are optional and should only be implemented if time permits.
+Polls, options, and votes were added in Milestone 5; see the poll table
+definitions below.
 
 ```mermaid
 erDiagram
@@ -194,7 +195,7 @@ Tracks which SQL migration files have been applied to the database, ensuring mig
 
 Migrations are executed inside a transaction alongside the schema change, so a migration is either fully applied or not applied at all.
 
-## 4. Optional Poll Tables
+## 4. Poll Tables
 
 The following tables store poll data.
 
@@ -341,7 +342,7 @@ A conditional update can help prevent conflicting status changes from concurrent
 
 ### 7.3 Poll creation and voting
 
-If polls are implemented:
+Poll creation and voting must:
 
 - Creating a poll and its options should be atomic.
 - Only active events can have an active poll accept votes.
