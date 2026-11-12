@@ -103,16 +103,19 @@ Successful response:
     "user": {
       "id": "creator-uuid",
       "username": "demo_creator"
-    }
+    },
+    "accessToken": "signed-bearer-token",
+    "tokenType": "Bearer",
+    "expiresIn": 900
   }
 }
 ```
 
-The authentication implementation may use a secure session cookie or a token-based approach.
-
-For this MVP, choose one approach and implement it consistently. If using cookies, configure appropriate `HttpOnly`, `SameSite`, and `Secure` settings for the deployment environment, together with CSRF protection where required.
+Protected endpoints require the token in the `Authorization: Bearer <accessToken>` header. Access tokens expire after 15 minutes; the creator must log in again after expiration. No public registration or refresh-token endpoint is provided.
 
 Login failures should return a generic authentication error rather than revealing whether a username exists.
+
+The demo creator is created by the development seed command using `SEED_CREATOR_USERNAME` and `SEED_CREATOR_PASSWORD`. These credentials must be configured locally and must not be used in production.
 
 ## 4. Event Endpoints
 
@@ -206,6 +209,8 @@ Allowed statuses:
 
 The backend must validate the requested lifecycle transition and verify event ownership.
 
+Allowed transitions are `DRAFT → ACTIVE` and `ACTIVE → ENDED`. Other transitions return `409 Conflict`.
+
 Only active events accept audience questions.
 
 ### 4.5 Get Public Event
@@ -274,7 +279,7 @@ Backend requirements:
 - Verify that the event is active.
 - Validate the display name and question content.
 - Create the question with `PENDING` status.
-- Apply basic rate limiting.
+- Rate limiting is deferred; public submission endpoints should be rate limited in a future milestone.
 - Return a suitable error if the event is not accepting questions.
 
 ### 5.2 Get Public Questions
@@ -285,13 +290,7 @@ Authentication: Not required.
 
 Returns only `APPROVED` and `ANSWERED` questions.
 
-Optional query parameters:
-
-```text
-?limit=20&cursor=example-cursor
-```
-
-Pagination may be implemented if time permits. A simple bounded result set is acceptable for the initial MVP.
+Results are bounded by a server-side limit. Pagination may be implemented if time permits.
 
 Successful response:
 
@@ -493,7 +492,7 @@ Examples of validation rules:
 | password         | Required                            |
 | event title      | Required, maximum 200 characters    |
 | display name     | Required, maximum 80 characters     |
-| question content | Required, non-empty, bounded length |
+| question content | Required, non-empty, maximum 2000 characters |
 | event status     | Must be an allowed enum value       |
 | question status  | Must be an allowed enum value       |
 | public code      | Must match the expected format      |

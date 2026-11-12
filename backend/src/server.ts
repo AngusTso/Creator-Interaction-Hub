@@ -1,6 +1,8 @@
-import { app } from './app.js';
-import { port } from './config/env.js';
+import { createApp } from './app.js';
+import { getJwtSecret, port } from './config/env.js';
 import { pool } from './database/pool.js';
+
+const app = createApp({ database: pool, tokenSecret: getJwtSecret() });
 
 async function startServer(): Promise<void> {
   await pool.query('SELECT 1');

@@ -97,10 +97,12 @@ Stores creator accounts that can manage events and moderate questions.
 
 | Column | Type | Constraints | Description |
 |---|---|---|---|
-| id | UUID | Primary key | Unique creator identifier |
-| username | VARCHAR(100) | Unique, not null | Login username |
+| id | UUID | Primary key, default `gen_random_uuid()` | Unique creator identifier |
+| username | VARCHAR(100) | Unique, not null, check format | Login username |
 | password_hash | TEXT | Not null | Securely hashed password |
-| created_at | TIMESTAMP | Not null | Account creation time |
+| created_at | TIMESTAMPTZ | Not null, default `NOW()` | Account creation time |
+
+Username format constraint: must be lowercase, trimmed, and between 1 and 100 characters.
 
 Notes:
 
@@ -115,14 +117,14 @@ Stores livestream-related audience participation events.
 
 | Column | Type | Constraints | Description |
 |---|---|---|---|
-| id | UUID | Primary key | Unique event identifier |
-| creator_id | UUID | Foreign key, not null | Event owner |
-| title | VARCHAR(200) | Not null | Event title |
+| id | UUID | Primary key, default `gen_random_uuid()` | Unique event identifier |
+| creator_id | UUID | Foreign key, not null, `ON DELETE RESTRICT` | Event owner |
+| title | VARCHAR(200) | Not null, check not empty | Event title |
 | description | TEXT | Nullable | Event description |
-| public_code | VARCHAR(32) | Unique, not null | Public participation identifier |
-| status | VARCHAR(20) | Not null | Event lifecycle status |
-| created_at | TIMESTAMP | Not null | Creation time |
-| updated_at | TIMESTAMP | Not null | Last update time |
+| public_code | VARCHAR(32) | Unique, not null, check hex format | Public participation identifier |
+| status | VARCHAR(20) | Not null, default `'DRAFT'`, check valid values | Event lifecycle status |
+| created_at | TIMESTAMPTZ | Not null, default `NOW()` | Creation time |
+| updated_at | TIMESTAMPTZ | Not null, default `NOW()` | Last update time |
 
 Allowed event statuses:
 
@@ -144,13 +146,13 @@ Stores audience-submitted questions.
 
 | Column | Type | Constraints | Description |
 |---|---|---|---|
-| id | UUID | Primary key | Unique question identifier |
-| event_id | UUID | Foreign key, not null | Associated event |
-| display_name | VARCHAR(80) | Not null | Audience display name |
-| content | TEXT | Not null | Submitted question |
-| status | VARCHAR(20) | Not null | Moderation status |
-| created_at | TIMESTAMP | Not null | Submission time |
-| updated_at | TIMESTAMP | Not null | Last status update |
+| id | UUID | Primary key, default `gen_random_uuid()` | Unique question identifier |
+| event_id | UUID | Foreign key, not null, `ON DELETE CASCADE` | Associated event |
+| display_name | VARCHAR(80) | Not null, check not empty | Audience display name |
+| content | TEXT | Not null, check not empty | Submitted question |
+| status | VARCHAR(20) | Not null, default `'PENDING'`, check valid values | Moderation status |
+| created_at | TIMESTAMPTZ | Not null, default `NOW()` | Submission time |
+| updated_at | TIMESTAMPTZ | Not null, default `NOW()` | Last status update |
 
 Allowed question statuses:
 
@@ -178,6 +180,17 @@ Business rules:
 - Questions cannot be submitted to events that are not active.
 
 The backend must enforce these rules. Database constraints should enforce the basic allowed status values, while application logic validates status transitions.
+
+### 3.4 Schema Migrations
+
+Tracks which SQL migration files have been applied to the database, ensuring migrations are applied exactly once.
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| name | TEXT | Primary key | Migration file name |
+| applied_at | TIMESTAMPTZ | Not null, default `NOW()` | Time the migration was applied |
+
+Migrations are executed inside a transaction alongside the schema change, so a migration is either fully applied or not applied at all.
 
 ## 4. Optional Poll Tables
 
@@ -243,10 +256,10 @@ The main relationships are:
 
 Foreign keys should prevent records from referencing nonexistent parent entities.
 
-For the MVP, deletion behaviour should be conservative:
+For the MVP, deletion behaviour is enforced by foreign keys:
 
-- Do not allow deletion of a creator while owned events still exist.
-- Deleting an event, if supported, should not leave orphaned questions or poll records.
+- Creator deletion is restricted while owned events exist (`ON DELETE RESTRICT`).
+- Deleting an event cascades to its questions (`ON DELETE CASCADE`), preventing orphaned records.
 - Prefer implementing event ending over event deletion if deletion is not necessary.
 
 ## 6. Constraints and Indexing
@@ -256,12 +269,16 @@ For the MVP, deletion behaviour should be conservative:
 | Table | Constraint | Purpose |
 |---|---|---|
 | CreatorUsers | Unique username | Prevent duplicate accounts |
+| CreatorUsers | Check username format | Must be lowercase, trimmed, 1–100 characters |
 | Events | Unique public_code | Ensure public event codes are unique |
-| Events | Foreign key creator_id | Ensure valid event ownership |
-| Events | Check status | Restrict event lifecycle values |
-| Questions | Foreign key event_id | Ensure valid event association |
-| Questions | Check status | Restrict question status values |
-| Questions | Not-null display_name/content | Require essential submission data |
+| Events | Foreign key creator_id | Ensure valid event ownership, `ON DELETE RESTRICT` |
+| Events | Check title not empty | Trimmed title must be 1–200 characters |
+| Events | Check public_code format | Must match `^[a-f0-9]{32}$` |
+| Events | Check status valid | Must be `DRAFT`, `ACTIVE`, or `ENDED` |
+| Questions | Foreign key event_id | Ensure valid event association, `ON DELETE CASCADE` |
+| Questions | Check status valid | Must be `PENDING`, `APPROVED`, `REJECTED`, or `ANSWERED` |
+| Questions | Check display_name not empty | Trimmed name must be 1–80 characters |
+| Questions | Check content not empty | Trimmed content must be 1–2000 characters |
 | Votes | Unique poll_id + voter_key | Prevent duplicate votes using the same key |
 
 For optional polls, use a composite foreign key or equivalent database/application validation to ensure that the selected option belongs to the specified poll.
@@ -272,8 +289,8 @@ For optional polls, use a composite foreign key or equivalent database/applicati
 |---|---|---|
 | CreatorUsers | Unique index on username | Efficient login lookup |
 | Events | Unique index on public_code | Efficient public event lookup |
-| Events | Index on creator_id | Retrieve a creator's events |
-| Questions | Composite index on (event_id, status, created_at) | Retrieve and filter event questions efficiently |
+| Events | Index `events_creator_id_idx` on creator_id | Retrieve a creator's events |
+| Questions | Composite index `questions_event_status_created_idx` on (event_id, status, created_at) | Retrieve and filter event questions efficiently |
 | Polls | Index on event_id | Retrieve polls belonging to an event |
 | Votes | Unique index on (poll_id, voter_key) | Enforce duplicate-vote protection |
 
@@ -345,12 +362,12 @@ Creator credentials, password hashes, internal ownership information, and other 
 
 ## 9. Migration and Seed Data
 
-Database schema changes should be managed through migrations rather than relying on manual database modifications.
+Database schema changes should be managed through migrations rather than relying on manual database modifications. A `schema_migrations` table tracks which migration files have been applied, ensuring each migration runs exactly once inside a transaction.
 
 The project should provide:
 
-- Initial schema migration.
-- A repeatable development/demo seed process.
+- Initial schema migration (`001_initial_schema.sql`).
+- A repeatable development/demo seed process using environment-provided creator credentials.
 - A demo creator account.
 - Optional sample event and questions for evaluation.
 
