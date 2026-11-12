@@ -1,7 +1,7 @@
 # Creator Interaction Hub
 
-Creator Interaction Hub is a lightweight audience Q&A tool that runs alongside
-an existing livestream. It helps creators organise audience questions; it is
+Creator Interaction Hub is a lightweight audience interactions tool that runs alongside an existing livestream.
+It helps creators organise audience questions and polls; it is
 not a streaming platform or a replacement for livestream chat.
 
 The application supports creator self-registration and login, event
