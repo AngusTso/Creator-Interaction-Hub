@@ -37,8 +37,9 @@ The project focuses on organising audience questions that might otherwise be bur
 7. Creator can mark questions as answered.
 8. Creator can register and manage polls; the audience can vote and see results.
 
-Polls and real-time audience updates are planned for Milestone 5. Final review
-and submission materials are planned for Milestone 6.
+Milestone 5 added creator signup, polls and voting, rate limits, and audience
+real-time updates. Milestone 6 prepared the final reviewer guides. See
+`submission-quickstart.md`, `ai-workflow.md`, and `architecture-overview.md`.
 
 ## 3. Technology Stack
 
@@ -152,20 +153,22 @@ Before submission, the developer verifies:
 
 ## 5. Development Milestones
 
-| Milestone                      | Objective                                                   | Expected result                     |
-| ------------------------------ | ----------------------------------------------------------- | ----------------------------------- |
-| 1. Foundation                  | Set up frontend, backend, database, and Docker              | Application environment runs        |
-| 2. Backend Core                | Implement authentication, events, questions, and moderation | Core API and business rules work    |
-| 3. Frontend Integration        | Build creator and audience interfaces                       | Complete Q&A workflow               |
-| 4. Verification                | Verify the MVP and moderator real-time updates               | Verified core Q&A workflow            |
-| 5. Interaction Features        | Signup, audience updates, polls, voter keys, rate limits      | Complete local Docker application     |
-| 6. Final Review and Submission | Address Cline findings and prepare accurate submission docs  | Reviewed and explainable submission   |
+| Milestone                      | Objective                                                   | Result |
+| ------------------------------ | ----------------------------------------------------------- | ------ |
+| 1. Foundation                  | Set up frontend, backend, database, and Docker              | Complete |
+| 2. Backend Core                | Implement authentication, events, questions, and moderation | Complete |
+| 3. Frontend Integration        | Build creator and audience interfaces                       | Complete |
+| 4. Verification                | Verify the MVP and moderator real-time updates               | Complete |
+| 5. Interaction Features        | Signup, audience updates, polls, voter keys, rate limits     | Complete |
+| 6. Final Review and Submission | Assess review findings and prepare reviewer guides           | Complete; repository publishing remains |
 
 The core Q&A workflow takes priority over optional functionality.
 
 ## 6. Repository Structure
 
-Suggested final repository:
+The implementation keeps the frontend and backend separate and stores
+supporting design documents at the repository root. Review and test evidence
+is under `reports/`.
 
 ```text
 creator-interaction-hub/
@@ -174,18 +177,12 @@ creator-interaction-hub/
 ├── reports/
 │   ├── reviews/
 │   └── testing/
-├── docs/
-│   ├── architecture.md
-│   ├── database-design.md
-│   └── design-decisions.md
 ├── docker-compose.yml
-├── AGENTS.md
 ├── README.md
-├── requirements.md
-├── milestones.md
-├── api-design.md
-├── testing-strategy.md
-├── CLINE_REVIEW.md
+├── architecture.md
+├── database-design.md
+├── api_design.md
+├── design_decisions.md
 └── .gitignore
 ```
 
@@ -197,96 +194,87 @@ The final repository should not contain secrets, credentials, dependencies, buil
 
 ### A. Working project
 
-- [ ] Accessible GitHub or other Git repository.
-- [ ] Clear project introduction.
-- [ ] Working core Q&A workflow.
-- [ ] Correct environment configuration.
-- [ ] Docker Compose startup instructions.
-- [ ] Database setup and seed instructions.
-- [ ] Demo account instructions, if applicable.
-- [ ] No missing dependencies or undocumented setup steps.
+- [ ] Accessible GitHub or other Git repository (publish and share the URL).
+- [x] Clear project introduction.
+- [x] Working core Q&A workflow.
+- [x] Correct environment configuration.
+- [x] Docker Compose startup instructions.
+- [x] Database setup and seed instructions.
+- [x] Demo account instructions, if applicable.
+- [x] No missing dependencies or undocumented setup steps.
 
 ### B. AI-assisted workflow
 
-- [ ] Identify GitHub Copilot Agent as the primary implementation tool.
-- [ ] Identify Cline as the independent reviewer.
-- [ ] Explain how tasks and specifications were given to the agents.
-- [ ] Explain the review and correction process.
-- [ ] Record approximate time spent.
-- [ ] Explain how AI-generated code was tested and verified.
-- [ ] Include examples of meaningful issues found and resolved, if any.
+- [x] Identify GitHub Copilot Agent as the primary implementation tool.
+- [x] Identify Cline as the independent reviewer.
+- [x] Explain how tasks and specifications were given to the agents.
+- [x] Explain the review and correction process.
+- [x] Record approximate time spent and the earlier effort estimate.
+- [x] Explain how AI-generated code was tested and verified.
+- [x] Include examples of findings evaluated and addressed.
 
 ### C. Design and architecture
 
-- [ ] High-level architecture diagram.
-- [ ] Database relationship diagram.
-- [ ] Explanation of the main technology choices.
-- [ ] Important design trade-offs.
-- [ ] Known limitations.
+- [x] High-level architecture diagram.
+- [x] Database relationship diagram.
+- [x] Explanation of the main technology choices.
+- [x] Important design trade-offs.
+- [x] Known limitations.
 
 ### D. Demonstration
 
-- [ ] Demonstrate creator login.
-- [ ] Demonstrate event creation and activation.
-- [ ] Demonstrate public question submission.
-- [ ] Demonstrate moderation.
-- [ ] Demonstrate approved questions appearing publicly.
-- [ ] Demonstrate persistent data after restarting the application.
+- [x] Demonstrate creator login.
+- [x] Demonstrate event creation and activation.
+- [x] Demonstrate public question submission.
+- [x] Demonstrate moderation.
+- [x] Demonstrate approved questions appearing publicly.
+- [x] Demonstrate persistent data after restarting the application.
 
 A short screen recording or screenshots can supplement the repository, but should not replace a runnable project.
 
 ## 8. AI Development Log
 
-Record actual development activity rather than estimating results retrospectively.
-
-| Activity                             | Tool                  |   Approx. time | Result / evidence           |
-| ------------------------------------ | --------------------- | -------------: | --------------------------- |
-| Product definition and requirements  | ChatGPT               | To be recorded | Requirements and scope      |
-| Architecture and database planning   | ChatGPT               | To be recorded | Design documents            |
-| Project foundation                   | Copilot Agent         | To be recorded | Running environment         |
-| Backend implementation               | Copilot Agent         | To be recorded | Working API                 |
-| Backend review                       | Cline                 | To be recorded | Review reports              |
-| Frontend implementation              | Copilot Agent         | To be recorded | Working interfaces          |
-| Frontend review                      | Cline                 | To be recorded | Review reports              |
-| Testing and corrections              | Copilot Agent + Cline | To be recorded | Test and review evidence    |
-| Final verification and documentation | Human + AI tools      | To be recorded | Submission-ready repository |
-
-**Total development time:** To be recorded after completion.
-
-The final account should distinguish actual active development time from elapsed calendar time.
+The estimated no-AI effort was 62–112 developer-hours: 32–52 hours for
+Milestones 1–3 and 30–60 for the remaining implementation. The recorded
+Copilot session spans about 4 hours 35 minutes; the developer estimates
+another 1.5 hours for ChatGPT web planning, or about 6 hours 5 minutes total.
+This suggests roughly 56–106 hours below the earlier estimate, but it is a
+planning comparison rather than stopwatch-measured savings. See
+`ai-workflow.md` for the calculation and caveats.
 
 ## 9. How AI Output Was Evaluated
 
 The evaluation process should explain more than which AI tools were used.
 
-Examples of evidence worth recording during development:
+Examples of evidence from development:
 
-- An implementation that initially failed a business-rule test.
-- A permission or data-exposure issue identified during review.
-- A database or API design that required revision.
-- A test that revealed an unexpected edge case.
-- An AI-generated abstraction or dependency that was rejected as unnecessary.
-- A feature that was deliberately excluded to protect the MVP scope.
+- The audience refresh gap found during review was confirmed and fixed with
+  Socket.IO notifications and REST refreshes.
+- A misplaced signup integration test was found during the database-backed
+  run, corrected, and rerun successfully.
+- Review claims were checked against code and requirements rather than
+  applied automatically; for example, the Vite dependency was already
+  declared, and exposing pending questions was correctly declined.
 
-Only include examples that actually occurred.
-
-The purpose is to demonstrate critical evaluation rather than claim that every AI-generated suggestion was correct.
+This process demonstrates critical evaluation rather than assuming every
+AI-generated suggestion is correct.
 
 ## 10. Final Submission Narrative
 
-The final submission should communicate the following story:
+The final submission communicates the following:
 
-I identified a practical problem related to audience interaction during livestreams and designed a lightweight application to address it.
+The developer identified a practical livestream-audience problem and defined
+a small, focused product: a companion tool for Q&A, moderation, and polls.
 
-I used AI tools throughout the development process, beginning with product requirements and architecture before moving into implementation.
+ChatGPT web helped plan requirements and design documents before coding.
+GitHub Copilot Agent implemented bounded milestones; Cline reviewed them
+independently. The developer owned product decisions, smoke tests, and final
+decisions on review findings.
 
-GitHub Copilot Agent was used as the primary implementation assistant. Cline was used independently to review changes, inspect potential issues, and evaluate the implementation against the documented requirements.
-
-Rather than accepting AI-generated code without verification, I used automated tests, manual end-to-end checks, and independent code reviews to evaluate the result and guide corrections.
-
-The final project demonstrates how I used AI to move from a problem definition to a working, testable application while retaining responsibility for technical decisions and final quality.
-
-This narrative must be updated to reflect the actual development process and results.
+Automated tests, typechecks, builds, Docker runtime checks, and human review
+were used to evaluate the result. The application and concise reviewer
+documents are complete; publishing the repository and sharing its URL remain
+the final submission steps.
 
 ## 11. Final Submission Principle
 
