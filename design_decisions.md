@@ -446,6 +446,22 @@ at least 32 bytes.
 
 **Security requirements:** Passwords are hashed with bcrypt. Login failures use a generic response. The signing secret must not be committed or reused outside local development.
 
+### ADR-016: Use a Tactile Neo-Brutalist Frontend Style
+
+**Decision:** Use plain CSS with a matte charcoal canvas, white structural
+borders, signal-yellow primary actions, sharp geometry, and hard offset button
+shadows. Bundle Inter, Space Grotesk, and JetBrains Mono locally under their
+OFL font licenses. Do not use Tailwind, CSS-in-JS, or a component library.
+
+**Context:** The interface is a high-contrast companion for livestream Q&A.
+
+**Reasoning:** Strong borders, clear status colors, and compact labels make
+events and moderation states easy to scan. Local font assets avoid runtime
+requests to third-party font services.
+
+**Scope:** Poll-specific visuals remain a future extension; this decision does
+not add polls to the core Q&A milestone.
+
 ## 11. Final Design Principle
 
 The project prioritises a small, complete, and explainable system over a large collection of partially implemented features.

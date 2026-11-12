@@ -4,10 +4,15 @@ Creator Interaction Hub is a lightweight audience Q&A tool that runs alongside
 an existing livestream. It helps creators organise audience questions; it is
 not a streaming platform or a replacement for livestream chat.
 
-The backend supports creator login, event management, public event access,
+The application supports creator login, event management, public event access,
 audience question submission, moderation, and public approved-question display.
-The frontend remains a foundation placeholder; its user interfaces are planned
-for a later milestone. Polls and real-time notifications are not implemented.
+The frontend provides creator login and event management, question moderation,
+and the public participation page. Polls and real-time notifications are not
+implemented.
+
+The frontend uses modular plain CSS and locally bundled Inter, Space Grotesk,
+and JetBrains Mono fonts. It does not use Tailwind CSS or a component library;
+see [frontend_design.md](./frontend_design.md) for the visual rules.
 
 ## Prerequisites
 
@@ -97,6 +102,11 @@ Install frontend dependencies and verify its TypeScript and production build:
 
 ```sh
 npm ci --prefix frontend
+npm test --prefix frontend
 npm run typecheck --prefix frontend
 npm run build --prefix frontend
 ```
+
+Frontend tests use Vitest and React Testing Library. Creator access tokens are
+kept in memory and are cleared when the page reloads; after the 15-minute token
+expiry, sign in again.
