@@ -1,0 +1,373 @@
+# Database Design
+
+## 1. Overview
+
+Creator Interaction Hub uses **PostgreSQL** as its primary relational database.
+
+The database stores creator accounts, events, audience questions, and optional poll-related data.
+
+The design prioritises:
+
+- Clear relationships between entities.
+- Data integrity through foreign keys and constraints.
+- Efficient retrieval of questions for moderation.
+- Secure separation between public and creator-only information.
+- Straightforward implementation and maintenance.
+
+The database is designed for a small MVP rather than a large-scale distributed system.
+
+## 2. Entity Relationship Diagram
+
+The core database consists of three entities:
+
+- `CreatorUsers`
+- `Events`
+- `Questions`
+
+Poll-related entities are optional and should only be implemented if time permits.
+
+```mermaid
+erDiagram
+    CREATOR_USERS ||--o{ EVENTS : creates
+    EVENTS ||--o{ QUESTIONS : receives
+    EVENTS ||--o{ POLLS : contains
+    POLLS ||--|{ POLL_OPTIONS : has
+    POLL_OPTIONS ||--o{ VOTES : receives
+    POLLS ||--o{ VOTES : contains
+
+    CREATOR_USERS {
+        uuid id PK
+        varchar username UK
+        varchar password_hash
+        timestamp created_at
+    }
+
+    EVENTS {
+        uuid id PK
+        uuid creator_id FK
+        varchar title
+        text description
+        varchar public_code UK
+        varchar status
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    QUESTIONS {
+        uuid id PK
+        uuid event_id FK
+        varchar display_name
+        text content
+        varchar status
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    POLLS {
+        uuid id PK
+        uuid event_id FK
+        varchar title
+        varchar status
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    POLL_OPTIONS {
+        uuid id PK
+        uuid poll_id FK
+        varchar option_text
+    }
+
+    VOTES {
+        uuid id PK
+        uuid poll_id FK
+        uuid option_id FK
+        varchar voter_key
+        timestamp created_at
+    }
+```
+
+The poll entities are included as an extension to the core model. They are not required for the initial Q&A workflow.
+
+## 3. Table Definitions
+
+### 3.1 CreatorUsers
+
+Stores creator accounts that can manage events and moderate questions.
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| id | UUID | Primary key | Unique creator identifier |
+| username | VARCHAR(100) | Unique, not null | Login username |
+| password_hash | TEXT | Not null | Securely hashed password |
+| created_at | TIMESTAMP | Not null | Account creation time |
+
+Notes:
+
+- Public creator registration is outside the MVP scope.
+- A demo creator account can be seeded for evaluation.
+- Passwords must never be stored in plaintext.
+- Authentication credentials must not be exposed through public APIs.
+
+### 3.2 Events
+
+Stores livestream-related audience participation events.
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| id | UUID | Primary key | Unique event identifier |
+| creator_id | UUID | Foreign key, not null | Event owner |
+| title | VARCHAR(200) | Not null | Event title |
+| description | TEXT | Nullable | Event description |
+| public_code | VARCHAR(32) | Unique, not null | Public participation identifier |
+| status | VARCHAR(20) | Not null | Event lifecycle status |
+| created_at | TIMESTAMP | Not null | Creation time |
+| updated_at | TIMESTAMP | Not null | Last update time |
+
+Allowed event statuses:
+
+- `DRAFT`
+- `ACTIVE`
+- `ENDED`
+
+Business rules:
+
+- Each event belongs to one creator.
+- A creator can own multiple events.
+- Public access uses `public_code`, rather than exposing internal creator information.
+- Only active events accept new questions.
+- Only the event owner can manage the event.
+
+### 3.3 Questions
+
+Stores audience-submitted questions.
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| id | UUID | Primary key | Unique question identifier |
+| event_id | UUID | Foreign key, not null | Associated event |
+| display_name | VARCHAR(80) | Not null | Audience display name |
+| content | TEXT | Not null | Submitted question |
+| status | VARCHAR(20) | Not null | Moderation status |
+| created_at | TIMESTAMP | Not null | Submission time |
+| updated_at | TIMESTAMP | Not null | Last status update |
+
+Allowed question statuses:
+
+- `PENDING`
+- `APPROVED`
+- `REJECTED`
+- `ANSWERED`
+
+Allowed status transitions:
+
+| Current status | Allowed next status |
+|---|---|
+| PENDING | APPROVED |
+| PENDING | REJECTED |
+| APPROVED | ANSWERED |
+| REJECTED | None |
+| ANSWERED | None |
+
+Business rules:
+
+- Every question belongs to one event.
+- New questions must start with `PENDING`.
+- Only authorised creators can moderate questions.
+- Public APIs must only return `APPROVED` and `ANSWERED` questions.
+- Questions cannot be submitted to events that are not active.
+
+The backend must enforce these rules. Database constraints should enforce the basic allowed status values, while application logic validates status transitions.
+
+## 4. Optional Poll Tables
+
+The following tables are only needed if poll functionality is implemented after the core Q&A workflow.
+
+### 4.1 Polls
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| id | UUID | Primary key | Unique poll identifier |
+| event_id | UUID | Foreign key, not null | Associated event |
+| title | VARCHAR(200) | Not null | Poll question or title |
+| status | VARCHAR(20) | Not null | Poll lifecycle status |
+| created_at | TIMESTAMP | Not null | Creation time |
+| updated_at | TIMESTAMP | Not null | Last update time |
+
+Allowed statuses:
+
+- `DRAFT`
+- `ACTIVE`
+- `CLOSED`
+
+### 4.2 PollOptions
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| id | UUID | Primary key | Unique option identifier |
+| poll_id | UUID | Foreign key, not null | Associated poll |
+| option_text | VARCHAR(200) | Not null | Option label |
+
+A poll contains multiple options. Each option belongs to one poll.
+
+### 4.3 Votes
+
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| id | UUID | Primary key | Unique vote identifier |
+| poll_id | UUID | Foreign key, not null | Associated poll |
+| option_id | UUID | Foreign key, not null | Selected option |
+| voter_key | VARCHAR(128) | Not null | Browser-issued participant key |
+| created_at | TIMESTAMP | Not null | Vote submission time |
+
+Important constraints:
+
+- A unique constraint on `(poll_id, voter_key)` prevents the same browser-issued key from voting multiple times in one poll.
+- The selected option must belong to the same poll as the vote.
+- Votes are accepted only while the poll is active.
+
+The browser-issued key is only a basic duplicate-vote deterrent. It is not reliable identity verification and can be bypassed by clearing browser data or using another browser/device.
+
+## 5. Relationships and Referential Integrity
+
+The main relationships are:
+
+| Relationship | Cardinality | Explanation |
+|---|---|---|
+| CreatorUsers → Events | One-to-many | One creator can create multiple events |
+| Events → Questions | One-to-many | One event can receive multiple questions |
+| Events → Polls | One-to-many | One event can contain multiple polls |
+| Polls → PollOptions | One-to-many | One poll contains multiple options |
+| Polls → Votes | One-to-many | One poll receives multiple votes |
+| PollOptions → Votes | One-to-many | One option can receive multiple votes |
+
+Foreign keys should prevent records from referencing nonexistent parent entities.
+
+For the MVP, deletion behaviour should be conservative:
+
+- Do not allow deletion of a creator while owned events still exist.
+- Deleting an event, if supported, should not leave orphaned questions or poll records.
+- Prefer implementing event ending over event deletion if deletion is not necessary.
+
+## 6. Constraints and Indexing
+
+### 6.1 Recommended constraints
+
+| Table | Constraint | Purpose |
+|---|---|---|
+| CreatorUsers | Unique username | Prevent duplicate accounts |
+| Events | Unique public_code | Ensure public event codes are unique |
+| Events | Foreign key creator_id | Ensure valid event ownership |
+| Events | Check status | Restrict event lifecycle values |
+| Questions | Foreign key event_id | Ensure valid event association |
+| Questions | Check status | Restrict question status values |
+| Questions | Not-null display_name/content | Require essential submission data |
+| Votes | Unique poll_id + voter_key | Prevent duplicate votes using the same key |
+
+For optional polls, use a composite foreign key or equivalent database/application validation to ensure that the selected option belongs to the specified poll.
+
+### 6.2 Recommended indexes
+
+| Table | Index | Reason |
+|---|---|---|
+| CreatorUsers | Unique index on username | Efficient login lookup |
+| Events | Unique index on public_code | Efficient public event lookup |
+| Events | Index on creator_id | Retrieve a creator's events |
+| Questions | Composite index on (event_id, status, created_at) | Retrieve and filter event questions efficiently |
+| Polls | Index on event_id | Retrieve polls belonging to an event |
+| Votes | Unique index on (poll_id, voter_key) | Enforce duplicate-vote protection |
+
+The composite question index supports the moderator dashboard, which commonly retrieves questions for a particular event filtered by status and ordered by submission time.
+
+Avoid adding indexes without a query or constraint that justifies them.
+
+## 7. Transactions and Data Integrity
+
+Some operations involve multiple validation or database steps. These should be handled carefully to avoid inconsistent state.
+
+### 7.1 Question submission
+
+The backend should:
+
+1. Resolve the event using its public code.
+2. Verify that the event is active.
+3. Validate the submitted display name and question content.
+4. Insert the question with `PENDING` status.
+
+The event status check and insertion should be protected against a concurrent event-ending operation. Use a transaction with appropriate locking or conditional database operations.
+
+### 7.2 Question moderation
+
+The backend should:
+
+1. Verify creator authentication.
+2. Verify that the question belongs to an event owned by that creator.
+3. Validate the requested status transition.
+4. Update the question only if its current status permits the transition.
+
+A conditional update can help prevent conflicting status changes from concurrent requests.
+
+### 7.3 Poll creation and voting (optional)
+
+If polls are implemented:
+
+- Creating a poll and its options should be atomic.
+- Voting should validate that the poll is active.
+- Voting should validate that the selected option belongs to that poll.
+- A unique constraint on `(poll_id, voter_key)` should enforce duplicate-vote protection.
+- The backend should handle uniqueness conflicts gracefully.
+
+## 8. Data Access and API Exposure
+
+The database schema does not determine which fields should be exposed to users.
+
+The backend must explicitly select and return the fields appropriate to each API.
+
+For example:
+
+**Public event response:**
+- Event title
+- Event description
+- Public code
+- Event status
+
+**Public question response:**
+- Question ID
+- Display name
+- Question content
+- Question status
+- Submission time
+
+**Creator-only response:**
+- All questions belonging to the creator's event, including pending and rejected questions.
+
+Creator credentials, password hashes, internal ownership information, and other unnecessary internal fields must not be exposed through public APIs.
+
+## 9. Migration and Seed Data
+
+Database schema changes should be managed through migrations rather than relying on manual database modifications.
+
+The project should provide:
+
+- Initial schema migration.
+- A repeatable development/demo seed process.
+- A demo creator account.
+- Optional sample event and questions for evaluation.
+
+Seed credentials should be documented for local evaluation only and must not be reused as production credentials.
+
+The database should use a persistent Docker volume so application restarts do not erase stored data.
+
+## 10. Database Design Completion Criteria
+
+The database design is considered implemented when:
+
+- Core tables and relationships are created.
+- Primary keys and foreign keys are defined.
+- Required unique and check constraints are applied.
+- Question retrieval indexes are created.
+- Event ownership and question lifecycle rules are enforced by the backend.
+- Database migrations can initialise a clean database.
+- Seed data supports the demo workflow.
+- Core application data persists after restarting Docker Compose.
+- Optional poll tables are only introduced if poll functionality is implemented.
