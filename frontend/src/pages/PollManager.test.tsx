@@ -36,6 +36,7 @@ describe('PollManager', () => {
         eventId="event-1"
         eventStatus="ACTIVE"
         onSessionExpired={vi.fn()}
+        refreshSignal={0}
       />,
     );
 
@@ -81,6 +82,7 @@ describe('PollManager', () => {
         eventId="event-1"
         eventStatus="DRAFT"
         onSessionExpired={vi.fn()}
+        refreshSignal={0}
       />,
     );
 

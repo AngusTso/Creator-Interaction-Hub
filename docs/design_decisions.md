@@ -354,8 +354,9 @@ Persist data successfully before emitting a corresponding notification.
 
 **Implementation:** Moderator rooms require a valid creator token and an event
 ownership check. Audience rooms are joined using the public event code and
-receive only public change notifications. The frontend reloads through REST
-on notification and reconnect; REST remains authoritative.
+receive only public change notifications. Both the audience page and creator
+poll manager reload current poll data through REST after poll notifications
+and reconnect; REST remains authoritative.
 
 ## 7. Deployment Decisions
 

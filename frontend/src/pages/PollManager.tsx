@@ -13,6 +13,7 @@ interface Props {
   eventId: string;
   eventStatus: EventStatus;
   onSessionExpired: () => void;
+  refreshSignal: number;
 }
 
 function isSessionExpired(error: unknown): boolean {
@@ -24,6 +25,7 @@ export default function PollManager({
   eventId,
   eventStatus,
   onSessionExpired,
+  refreshSignal,
 }: Props) {
   const [polls, setPolls] = useState<Poll[]>([]);
   const [title, setTitle] = useState('');
@@ -50,7 +52,7 @@ export default function PollManager({
 
   useEffect(() => {
     void loadPolls();
-  }, [loadPolls]);
+  }, [loadPolls, refreshSignal]);
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

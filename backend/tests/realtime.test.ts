@@ -124,6 +124,13 @@ describe('moderator Socket.IO access', () => {
       realtime.notifyQuestionSubmitted(ownedEventId);
       const notificationPayload = await notification;
       expect(notificationPayload).toEqual({ eventId: ownedEventId });
+
+      const pollUpdate = waitForSocketEvent<{ eventId: string }>(
+        socket,
+        'poll:updated',
+      );
+      realtime.notifyPollUpdated(ownedEventId);
+      expect(await pollUpdate).toEqual({ eventId: ownedEventId });
       expect(moderationRoom(ownedEventId)).toBe(
         `event:${ownedEventId}:moderators`,
       );

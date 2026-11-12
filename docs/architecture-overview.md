@@ -89,4 +89,4 @@ them here would add little.
 - [Full architecture](./architecture.md)
 - [Database design](./database-design.md) and [API design](./api_design.md)
 - [Design decisions](./design_decisions.md) and [frontend design](./frontend_design.md)
-- [Testing strategy](./testing%20strategy.md) and [verified results](./reports/testing/manual-verification.md)
+- [Testing strategy](./testing%20strategy.md) and [verified results](../reports/testing/manual-verification.md)

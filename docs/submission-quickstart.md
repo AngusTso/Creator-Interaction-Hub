@@ -1,31 +1,44 @@
 # Quick Start
 
-## Run from a clone
+Follow these steps on Windows with PowerShell. Install Git and Docker Desktop
+first, and start Docker Desktop before running Compose.
 
-Prerequisite: Docker Desktop or Docker Engine with Docker Compose.
+## 1. Clone the repository
 
-```sh
-git clone https://github.com/OWNER/REPOSITORY.git
-cd REPOSITORY
-cp .env.example .env
+```powershell
+git clone https://github.com/AngusTso/Creator-Interaction-Hub.git
+Set-Location Creator-Interaction-Hub
 ```
 
-Replace `OWNER` and `REPOSITORY` with the published GitHub owner and repository
-name.
+## 2. Configure local environment
 
-Replace the placeholder passwords and set a unique `JWT_SECRET` of at least
-32 characters in `.env`. Do not commit this file.
+```powershell
+Copy-Item .env.example .env
+notepad .env
+```
 
-```sh
+In `.env`, replace the placeholder values. Use the same password for
+`POSTGRES_PASSWORD` and `PGPASSWORD`, set a unique `JWT_SECRET` with at least
+32 characters, and choose a local `SEED_CREATOR_PASSWORD`. Save the file; do
+not commit it.
+
+## 3. Build and start the application
+
+From the repository folder, run:
+
+```powershell
 docker compose up --build
 ```
 
-Open <http://localhost:5173>. Sign up, create and activate an event, then open
-its public link in another browser to submit a question. Approve it in the
-moderation view to publish it. Poll creation and voting are available from the
-event and public pages.
+Wait for the services to report healthy/started. Open
+<http://localhost:5173>, sign up, create and activate an event, then open its
+public link in another tab to submit a question. Approve it in the moderation
+view; you can also create a poll and vote on the public page.
 
-Press `Ctrl+C` to stop. PostgreSQL data persists in a named volume; avoid
-`docker compose down -v` unless you intend to delete it.
+Press `Ctrl+C` in the Compose window to stop. PostgreSQL data persists in a
+named volume. Avoid `docker compose down -v` unless you intend to delete it.
 
-For test commands and test-database setup, see [README.md](./README.md#run-checks).
+On Linux or macOS, use `cd Creator-Interaction-Hub` and
+`cp .env.example .env`; edit `.env` with your preferred text editor.
+For test commands and test-database setup, see
+[README.md](../README.md#run-checks).

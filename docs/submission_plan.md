@@ -39,7 +39,8 @@ The project focuses on organising audience questions that might otherwise be bur
 
 Milestone 5 added creator signup, polls and voting, rate limits, and audience
 real-time updates. Milestone 6 prepared the final reviewer guides. See
-`submission-quickstart.md`, `ai-workflow.md`, and `architecture-overview.md`.
+[quick start](./submission-quickstart.md), [AI workflow](./ai-workflow.md), and
+[architecture overview](./architecture-overview.md).
 
 ## 3. Technology Stack
 
@@ -160,29 +161,26 @@ Before submission, the developer verifies:
 | 3. Frontend Integration        | Build creator and audience interfaces                       | Complete |
 | 4. Verification                | Verify the MVP and moderator real-time updates               | Complete |
 | 5. Interaction Features        | Signup, audience updates, polls, voter keys, rate limits     | Complete |
-| 6. Final Review and Submission | Assess review findings and prepare reviewer guides           | Complete; repository publishing remains |
+| 6. Final Review and Submission | Assess review findings and prepare reviewer guides           | Complete |
 
 The core Q&A workflow takes priority over optional functionality.
 
 ## 6. Repository Structure
 
-The implementation keeps the frontend and backend separate and stores
-supporting design documents at the repository root. Review and test evidence
-is under `reports/`.
+The implementation keeps the frontend and backend separate, stores supporting
+design documents under `docs/`, and keeps review and test evidence under
+`reports/`.
 
 ```text
 creator-interaction-hub/
 ├── frontend/
 ├── backend/
+├── docs/
 ├── reports/
 │   ├── reviews/
 │   └── testing/
 ├── docker-compose.yml
 ├── README.md
-├── architecture.md
-├── database-design.md
-├── api_design.md
-├── design_decisions.md
 └── .gitignore
 ```
 
@@ -194,7 +192,8 @@ The final repository should not contain secrets, credentials, dependencies, buil
 
 ### A. Working project
 
-- [ ] Accessible GitHub or other Git repository (publish and share the URL).
+- [x] Accessible public GitHub repository:
+  <https://github.com/AngusTso/Creator-Interaction-Hub>.
 - [x] Clear project introduction.
 - [x] Working core Q&A workflow.
 - [x] Correct environment configuration.
@@ -273,8 +272,8 @@ decisions on review findings.
 
 Automated tests, typechecks, builds, Docker runtime checks, and human review
 were used to evaluate the result. The application and concise reviewer
-documents are complete; publishing the repository and sharing its URL remain
-the final submission steps.
+documents are available in the
+[public GitHub repository](https://github.com/AngusTso/Creator-Interaction-Hub).
 
 ## 11. Final Submission Principle
 

@@ -116,9 +116,13 @@ describe('ModerationPage', () => {
     const questionHandler = socketMock.on.mock.calls.find(
       ([eventName]) => eventName === 'question:created',
     )?.[1];
+    const pollHandler = socketMock.on.mock.calls.find(
+      ([eventName]) => eventName === 'poll:updated',
+    )?.[1];
 
     expect(connectHandler).toBeTypeOf('function');
     expect(questionHandler).toBeTypeOf('function');
+    expect(pollHandler).toBeTypeOf('function');
 
     await act(async () => {
       connectHandler?.();
@@ -129,6 +133,18 @@ describe('ModerationPage', () => {
       questionHandler?.({ eventId: event.id });
     });
     await waitFor(() => expect(loadQuestions).toHaveBeenCalledTimes(2));
+
+    const loadPolls = vi.spyOn(api, 'listCreatorPolls');
+    await act(async () => {
+      pollHandler?.({ eventId: event.id });
+    });
+    await waitFor(() => expect(loadPolls).toHaveBeenCalledTimes(2));
+    expect(loadPolls).toHaveBeenLastCalledWith('access-token', event.id);
+
+    await act(async () => {
+      pollHandler?.({ eventId: 'another-event' });
+    });
+    expect(loadPolls).toHaveBeenCalledTimes(2);
 
     await act(async () => {
       connectHandler?.();

@@ -601,4 +601,5 @@ The API design is considered implemented when:
 - Poll endpoints enforce ownership, status transitions, one-active-poll
   rules, and duplicate-vote constraints.
 - Public question and poll updates are delivered through Socket.IO as
-  notifications, with REST as the source of truth.
+  notifications. Poll changes also notify the authenticated event moderator;
+  REST remains the source of truth.

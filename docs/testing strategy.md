@@ -144,6 +144,8 @@ Priority cases:
 - Poll UI displays vote counts and percentages and reports duplicate votes.
 - Question submission displays success and error feedback.
 - New-question notifications refresh the moderator queue.
+- Public votes notify the connected event moderator, whose poll results
+  refresh through REST.
 
 ### 4.4 End-to-End Manual Verification
 

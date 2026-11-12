@@ -149,6 +149,7 @@ export function createRealtimeServer(
       io.to(audienceRoom(eventId)).emit('event:updated', { eventId });
     },
     notifyPollUpdated(eventId: string) {
+      io.to(moderationRoom(eventId)).emit('poll:updated', { eventId });
       io.to(audienceRoom(eventId)).emit('poll:updated', { eventId });
     },
   };

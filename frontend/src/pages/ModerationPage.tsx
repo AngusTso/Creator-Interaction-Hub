@@ -38,6 +38,7 @@ export default function ModerationPage({
   const [isLoading, setIsLoading] = useState(true);
   const [busyQuestionId, setBusyQuestionId] = useState<string | null>(null);
   const [liveStatus, setLiveStatus] = useState('CONNECTING');
+  const [pollRefreshSignal, setPollRefreshSignal] = useState(0);
 
   const loadData = useCallback(async () => {
     setError(null);
@@ -89,6 +90,11 @@ export default function ModerationPage({
     socket.on('question:created', (notification: { eventId: string }) => {
       if (notification.eventId === eventId) {
         void loadData();
+      }
+    });
+    socket.on('poll:updated', (notification: { eventId: string }) => {
+      if (notification.eventId === eventId) {
+        setPollRefreshSignal((current) => current + 1);
       }
     });
 
@@ -248,6 +254,7 @@ export default function ModerationPage({
           eventId={eventId}
           eventStatus={event.status}
           onSessionExpired={onSessionExpired}
+          refreshSignal={pollRefreshSignal}
         />
       )}
     </main>
